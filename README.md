@@ -111,6 +111,13 @@ The size win is real and is what matters for transmission/on-chain. The speed *r
 coordinates (defer inversions) or a native curve library recover the speed while keeping the small proofs —
 that's an implementation detail, not a soundness one.
 
+**Throughput** (`throughput.py`, MEASURED on the M4 Mini cluster, full certificate prove+verify, MODP n=16):
+~0.42 certs/s single-core; ~2.5 certs/s on one 10-core M4 (6× scaling, 60% efficiency across its
+performance+efficiency cores); ~5 certs/s across two Minis. Certificates are independent, so throughput scales
+with **cores**, not with a GPU — this confirms the cost is per-certificate pure-Python bigint, exactly what a
+log-size argument + native crypto (not an accelerator) would cut. Deployable today for occasional high-value
+actions (a payment, a git op); not yet for high-frequency streams.
+
 ## A real agent action, carrying its own proof (`live_agent_bridge.py`)
 
 Not a demo dict — an actual agent tool call, end to end. The input is what an agent proposes through qedra (a
