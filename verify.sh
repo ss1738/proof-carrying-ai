@@ -11,6 +11,7 @@ coq Compliance.v
 coq PolicyDSL.v
 coq RangeProof.v
 echo "Runnable demos (python):"
+py ec_group.py
 py demo_certificate.py
 py demo_policy.py
 py zk_range.py
