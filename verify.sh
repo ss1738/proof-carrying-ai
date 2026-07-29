@@ -9,9 +9,12 @@ py()  { printf "  Run  %-22s " "$1"; if python3 "$1" >/dev/null 2>&1; then echo 
 echo "Machine-checked proofs (coqc):"
 coq Compliance.v
 coq PolicyDSL.v
+coq RangeProof.v
 echo "Runnable demos (python):"
 py demo_certificate.py
 py demo_policy.py
+py zk_range.py
+py demo_structured_certificate.py
 echo
 if [ "$fail" -eq 0 ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit "$fail"

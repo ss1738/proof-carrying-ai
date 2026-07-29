@@ -13,9 +13,12 @@ $ ./verify.sh
 Machine-checked proofs (coqc):
   Coq  Compliance.v           PASS
   Coq  PolicyDSL.v            PASS
+  Coq  RangeProof.v           PASS
 Runnable demos (python):
   Run  demo_certificate.py    PASS
   Run  demo_policy.py         PASS
+  Run  zk_range.py            PASS
+  Run  demo_structured_certificate.py PASS
 ALL CHECKS PASSED
 ```
 
@@ -53,9 +56,40 @@ The Python `Rule` (a decidable predicate) mirrors the Coq `Rule := Action -> boo
 policy and the proven model are the same object.
 
 **Which rules ZK-prove today vs need new circuits** (honest): `allowlist`/`denylist`/`residency` are
-**set-membership** — qedra's Sigma OR-proof already does this. `spend_cap` is a **range proof** (standard ZK,
-next circuit). `no_secret` is **semantic** — the ZK can prove a syntactic regex-check, which is honestly a
-*weaker* property than "contains no secret"; that gap is stated, not hidden.
+**set-membership** — qedra's Sigma OR-proof already does this. `spend_cap` is a **range proof** — now built
+(`zk_range.py`, below). `no_secret` is **semantic** — the ZK can prove a syntactic regex-check, which is
+honestly a *weaker* property than "contains no secret"; that gap is stated, not hidden.
+
+## The spend_cap circuit: a ZK range proof (`zk_range.py` + `coq/RangeProof.v`)
+
+`spend_cap` ("amount ≤ limit") needs a **range proof**, not set-membership. `zk_range.py` builds one by
+**bit-decomposition**: to prove the hidden `d = limit − amount` lies in `[0, 2^n)`, commit each bit of `d`,
+prove each bit is 0 or 1 (**reusing qedra's tested Sigma OR-proof over the set {0,1}**), and let the Pedersen
+homomorphism bind them — the verifier recomputes `∏ Cᵢ^(2^i)` and checks it equals the publicly-derivable
+`C_d = g^limit · C_amount⁻¹`. Self-test: honest `500 ≤ 1000` **verifies**; a forged `5000 ≤ 1000` is
+**rejected**; the prover cannot construct a proof of a false statement.
+
+The one arithmetic fact this rests on — *n genuine bits reconstruct a value strictly below 2ⁿ* — is
+machine-checked and **axiom-free** in `coq/RangeProof.v` (`range_bound`, `spend_cap_sound`). If that were
+false, a valid-looking bit proof would bound nothing.
+
+## The landmark seed: a certificate for a real agent action (`demo_structured_certificate.py`)
+
+Not git branches — an **agentic payment**. The certificate proves, in zero knowledge, that a payment obeyed a
+two-rule policy — `amount ≤ cap` (**ZK range proof**) **and** `counterparty ∈ allowlist` (**ZK
+set-membership**) — without revealing the amount or the counterparty, verifiable from public data alone:
+
+```
+policy:  amount <= 1000 (ZK range)   AND   counterparty in allowlist (ZK set-membership)
+  compliant  (amount=750,  cp=bob)      -> certificate VERIFIED
+  over-cap   (amount=5000)             -> prover CANNOT build a certificate
+  bad-cp     (cp=mallory)              -> prover CANNOT build a certificate
+  tampered   (swapped C_amount=9999)    -> certificate REJECTED
+```
+
+This is the first proof-carrying compliance certificate for a *structured* agent action with **both** rules
+proven in ZK and the underlying math machine-checked. It is the seed of the landmark, not the finished
+system (see scope below).
 
 ## Why it's defensible
 
@@ -65,11 +99,13 @@ The moat is the intersection almost nobody holds: **formal verification (Coq) + 
 
 ## Honest scope (this is a seed, not the finished landmark)
 
-- The ZK policy reused here is qedra's **git-branch policy** — the one domain qedra's ZK covers today. It is a
-  working proof-of-concept of the *shape*, not yet a general agent-action prover.
-- **Roadmap:** generalize the policy DSL (spend caps, no-PII, data-residency, tool-call constraints) →
-  compile it to circuits → scale proving (Nova folding / GPU) → ship the first verifiable **certificate of
-  agent-action compliance** for a real agent action (e.g. an agentic payment) as the landmark artifact.
+- The ZK now covers **two rule shapes**: set-membership (allowlist/residency, via qedra) and a range proof
+  (spend_cap, `zk_range.py`). `demo_structured_certificate.py` proves both on a real payment. Still a seed,
+  not a general prover: `no_secret` is only syntactically ZK-provable, and the range proof uses a classic
+  bit-decomposition (sound, but larger proofs than a modern range argument like Bulletproofs).
+- **Roadmap:** more rule circuits (no-PII, data-residency, tool-call constraints) → succinct range/aggregation
+  (Bulletproofs / Nova folding, GPU as circuits scale — CPU is fine at today's sizes) → wire a live agent's
+  action through the certificate end-to-end as the landmark artifact.
 - Builds directly on [qedra](https://github.com/ss1738/qedra) (the enforcer + the ZK) and
   [epbs-formal](https://github.com/ss1738/epbs-formal) (the machine-checked-proof craft).
 
