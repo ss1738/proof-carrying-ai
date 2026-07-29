@@ -1,0 +1,20 @@
+[package]
+name = "zkcore"
+version = "0.1.0"
+edition = "2021"
+description = "Native (Rust) prover/verifier for qedra's Sigma OR-proof over Pedersen commitments, wire-compatible with the Python zk_core (same MODP group, same Fiat-Shamir encoding)."
+
+[[bin]]
+name = "zkcore"
+path = "src/main.rs"
+
+[dependencies]
+num-bigint = { version = "0.4", features = ["rand"] }
+num-integer = "0.1"
+num-traits = "0.2"
+rand = "0.8"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 3
+lto = true

@@ -118,6 +118,25 @@ with **cores**, not with a GPU — this confirms the cost is per-certificate pur
 log-size argument + native crypto (not an accelerator) would cut. Deployable today for occasional high-value
 actions (a payment, a git op); not yet for high-frequency streams.
 
+## A native (Rust) prover, wire-compatible with the Python core (`rust/zkcore`)
+
+`rust/zkcore` reimplements qedra's Sigma OR-proof over the 2048-bit MODP group in Rust, with **byte-identical**
+group constants, serialization, and Fiat-Shamir hashing. A proof produced in Rust verifies in Python and vice
+versa, so it is provably the *same protocol*, not a drifting reimplementation.
+
+**Measured on `ironman` (M4 Mini, same box, |allowed set|=3, 200 reps):**
+
+| | prove | verify |
+|---|---|---|
+| Python `qedra.zk_core` | 126.9 ms | 142.7 ms |
+| Rust `zkcore` | **17.7 ms** | **19.9 ms** |
+| speedup | **~7.2×** | **~7.2×** |
+
+Cross-language: `rust -> python verify OK`, `python -> rust verify OK`, tampered commitment rejected by both
+(`rust/interop_test.py`). The ~7× is honest for a like-for-like bignum port (num-bigint vs CPython `pow`);
+GMP-backed bigints (`rug`) or Montgomery arithmetic would widen it further. Builds and runs on the Mini
+cluster (`cargo build --release`), per the repo's compute rules.
+
 ## A real agent action, carrying its own proof (`live_agent_bridge.py`)
 
 Not a demo dict — an actual agent tool call, end to end. The input is what an agent proposes through qedra (a
