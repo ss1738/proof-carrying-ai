@@ -15,6 +15,7 @@ Machine-checked proofs (coqc):
   Coq  PolicyDSL.v            PASS
   Coq  RangeProof.v           PASS
 Runnable demos (python):
+  Run  ec_group.py            PASS
   Run  demo_certificate.py    PASS
   Run  demo_policy.py         PASS
   Run  zk_range.py            PASS
@@ -90,6 +91,24 @@ policy:  amount <= 1000 (ZK range)   AND   counterparty in allowlist (ZK set-mem
 This is the first proof-carrying compliance certificate for a *structured* agent action with **both** rules
 proven in ZK and the underlying math machine-checked. It is the seed of the landmark, not the finished
 system (see scope below).
+
+## Group-generic: 2048-bit MODP *or* secp256k1 (`ec_group.py`)
+
+The whole stack is parametric in the group (qedra's interface: `op, mul, g, h, q, ser, deser, eq`).
+`ec_group.py` is a pure-Python secp256k1 group (nothing-up-my-sleeve second generator) that drops in with no
+changes to the proofs. `demo_structured_certificate.py` runs on it; `zk_range.py` is verified sound over both.
+
+**Measured** (`bench.py`, this M-series Mac, CPU-only — the numbers corrected my own prediction):
+
+| group | range-proof size (n=32) | prove (n=32) |
+|---|---|---|
+| MODP-2048 | 140 KB | ~2.4 s |
+| secp256k1 | **18 KB (~8× smaller)** | ~5.2 s (~2× *slower*) |
+
+The size win is real and is what matters for transmission/on-chain. The speed *regression* is honest: naive
+**affine** EC does a modular inverse per point-add, whereas 2048-bit `pow()` is a tuned C builtin. Projective
+coordinates (defer inversions) or a native curve library recover the speed while keeping the small proofs —
+that's an implementation detail, not a soundness one.
 
 ## Why it's defensible
 

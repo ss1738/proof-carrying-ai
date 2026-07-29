@@ -18,12 +18,12 @@ import sys
 
 sys.path.insert(0, os.path.expanduser("~/agent-guardrail"))
 from qedra import zk_core
-from qedra.zk import MODP
 from qedra.zk_core import ZKProof
 
 import zk_range
+from ec_group import EC
 
-G = MODP
+G = EC          # secp256k1: ~8x smaller/faster proofs than the 2048-bit MODP group
 Q = G.q
 
 # ---- public policy ----
@@ -38,7 +38,7 @@ def make_certificate(amount: int, counterparty: str) -> dict:
     (a proof of a false statement cannot be produced)."""
     cid = COUNTERPARTIES[counterparty]
     r_a, r_c = secrets.randbelow(Q), secrets.randbelow(Q)
-    C_amount, range_pf = zk_range.prove_le(amount, r_a, CAP, NBITS)            # spend_cap (range)
+    C_amount, range_pf = zk_range.prove_le(amount, r_a, CAP, NBITS, group=G)    # spend_cap (range)
     memb_pf, C_cp = zk_core.prove(G, ALLOWED_IDS, cid, r_c, "allow", "cert/counterparty")  # allowlist (membership)
     return {"C_amount": C_amount, "range": range_pf,
             "C_cp": G.ser(C_cp), "membership": memb_pf.to_dict()}
@@ -46,7 +46,7 @@ def make_certificate(amount: int, counterparty: str) -> dict:
 
 def verify_certificate(cert: dict) -> bool:
     """Verifier side: public data only. True iff (amount <= CAP) AND (counterparty in ALLOWED_IDS), in ZK."""
-    cap_ok = zk_range.verify_le(cert["C_amount"], CAP, cert["range"])
+    cap_ok = zk_range.verify_le(cert["C_amount"], CAP, cert["range"], group=G)
     cp_ok = zk_core.verify(G, ALLOWED_IDS, G.deser(cert["C_cp"]),
                            ZKProof.from_dict(cert["membership"]), "cert/counterparty")
     return cap_ok and cp_ok
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     # 4. tamper: splice an over-cap commitment under an otherwise-valid cert -> verifier rejects
     tampered = dict(cert)
-    tampered["C_amount"] = zk_range.commit(9999, secrets.randbelow(Q))
+    tampered["C_amount"] = zk_range.commit(9999, secrets.randbelow(Q), group=G)
     v = verify_certificate(tampered)
     ok = ok and (not v)
     print(f"  tampered   (swapped C_amount=9999)    -> certificate {'VERIFIED *** BUG ***' if v else 'REJECTED (correct)'}")
