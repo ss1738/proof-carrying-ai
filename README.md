@@ -20,6 +20,7 @@ Runnable demos (python):
   Run  demo_policy.py         PASS
   Run  zk_range.py            PASS
   Run  demo_structured_certificate.py PASS
+  Run  live_agent_bridge.py   PASS
 ALL CHECKS PASSED
 ```
 
@@ -109,6 +110,25 @@ The size win is real and is what matters for transmission/on-chain. The speed *r
 **affine** EC does a modular inverse per point-add, whereas 2048-bit `pow()` is a tuned C builtin. Projective
 coordinates (defer inversions) or a native curve library recover the speed while keeping the small proofs —
 that's an implementation detail, not a soundness one.
+
+## A real agent action, carrying its own proof (`live_agent_bridge.py`)
+
+Not a demo dict — an actual agent tool call, end to end. The input is what an agent proposes through qedra (a
+git tool call; a Claude Code `PreToolUse` Bash payload), parsed into a qedra `Action` exactly as qedra's
+executor does, run through qedra's **real gate** (`Guardrail.check`). An ALLOWED action in the ZK-covered
+domain gets a **proof-carrying receipt**: a zero-knowledge proof it lies in the allowed set **plus** an
+Ed25519 signature (qedra's session key). Anyone re-checks both from public data + the pinned public key:
+
+```
+  ALLOW    [ZK-cert] git commit               -> verify OK  (signature valid AND ZK compliance proof verifies)
+  BLOCK    [signed ] force-push to main       -> verify OK  (signed decision 'BLOCK', no compliance cert)
+  ALLOW    [ZK-cert] push a feature branch    -> verify OK  (signature valid AND ZK compliance proof verifies)
+  ALLOW    [signed ] run tests (shell)        -> verify OK  (signed decision, outside ZK domain)
+  tampered force-push BLOCK->ALLOW            -> verify FAIL (signature invalid)
+```
+
+No trust in the agent, the operator, or this process: a blocked action yields **no** compliance proof (you
+cannot certify compliance of a non-compliant action), and flipping a receipt's verdict breaks the signature.
 
 ## Why it's defensible
 
