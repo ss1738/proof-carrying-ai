@@ -10,10 +10,12 @@ distinction — "here is a proof it complied" vs "we didn't find a problem" — 
 
 ```
 $ ./verify.sh
-Machine-checked compliance proof (coqc):
-  Coq  Compliance.v          PASS
-Zero-knowledge certificate demo (python):
-  ZK   demo_certificate.py   PASS
+Machine-checked proofs (coqc):
+  Coq  Compliance.v           PASS
+  Coq  PolicyDSL.v            PASS
+Runnable demos (python):
+  Run  demo_certificate.py    PASS
+  Run  demo_policy.py         PASS
 ALL CHECKS PASSED
 ```
 
@@ -33,6 +35,27 @@ independently-checkable layers:
 
 **Together:** a verifying certificate implies the hidden action obeyed the formal policy — no trust in the
 agent, the operator, or the server.
+
+## A general policy DSL (beyond git)
+
+`coq/PolicyDSL.v` + `policy_dsl.py` generalize the single-predicate case to a real **composable policy** over
+*structured* agent actions (a payment, a tool call, a data access) — not just git ops. A policy is a
+conjunction of rules: `spend_cap`, `allowlist`, `denylist`, `no_secret`, `residency`. `demo_policy.py` runs a
+realistic agentic-payment policy and names the violated rule on each block.
+
+Machine-checked, axiom-free, parametric in the action type (`coq/PolicyDSL.v`):
+- `policy_conjunction_sound` — ALLOW iff **every** rule passes (no rule silently skipped).
+- `policy_blocks_on_violation` — **any** violated rule forces BLOCK (no bypass).
+- `adding_a_rule_only_restricts` — defence-in-depth is monotone-safe.
+- `allowed_set_exact` — what the ZK layer proves membership in == the compliant actions.
+
+The Python `Rule` (a decidable predicate) mirrors the Coq `Rule := Action -> bool` exactly, so the runnable
+policy and the proven model are the same object.
+
+**Which rules ZK-prove today vs need new circuits** (honest): `allowlist`/`denylist`/`residency` are
+**set-membership** — qedra's Sigma OR-proof already does this. `spend_cap` is a **range proof** (standard ZK,
+next circuit). `no_secret` is **semantic** — the ZK can prove a syntactic regex-check, which is honestly a
+*weaker* property than "contains no secret"; that gap is stated, not hidden.
 
 ## Why it's defensible
 
