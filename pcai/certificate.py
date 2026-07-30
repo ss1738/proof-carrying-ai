@@ -2,7 +2,7 @@
 
 `issue(action, policy, key)` takes an agent action with SENSITIVE fields (amount, counterparty), checks it
 against a formal policy, and returns a Certificate that proves compliance in ZERO KNOWLEDGE:
-  - spend_cap (amount <= cap)      -> a ZK range proof (zk_range, secp256k1)
+  - spend_cap (amount <= cap)      -> a ZK Bulletproofs range proof (logarithmic size, secp256k1)
   - allowlist (counterparty in S)  -> a ZK set-membership proof (qedra zk_core, secp256k1)
 plus an Ed25519 signature over the whole bundle. The certificate reveals only the public policy, the
 commitments, the proofs, and the signature -- never the amount or the counterparty.
@@ -18,7 +18,7 @@ import json
 import secrets
 from dataclasses import dataclass
 
-from . import _range as zk_range
+from . import _bulletproof as _bp
 from . import _zkcore as zk_core
 from ._ec import EC
 from ._zkcore import ZKProof
@@ -99,7 +99,7 @@ class Certificate:
         cap = int(policy["spend_cap"])
         try:
             Ca = _G.deser(self.commitments["amount"])
-            if not zk_range.verify_le(Ca, cap, self.proofs["spend_cap"], group=_G):
+            if not _bp.verify_le(Ca, cap, self.proofs["spend_cap"]):
                 return False, "spend_cap ZK range proof does not verify"
             if not _verify_membership(self.commitments["counterparty"], policy["allowlist"],
                                       self.proofs["allowlist"], "pcai/allowlist"):
@@ -135,7 +135,7 @@ def issue(action: dict, policy: dict, signing_key, nbits: int = 32) -> Certifica
         raise ValueError("residency violated: region not permitted")
 
     r_a = secrets.randbelow(Q)
-    Ca, range_pf = zk_range.prove_le(amount, r_a, cap, nbits, group=_G)
+    Ca, range_pf = _bp.prove_le(amount, r_a, cap, nbits)
     Ccp_hex, memb = _prove_membership(counterparty, allowed_names, "pcai/allowlist")
 
     commitments = {"amount": _G.ser(Ca), "counterparty": Ccp_hex}

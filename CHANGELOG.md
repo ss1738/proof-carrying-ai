@@ -4,6 +4,9 @@
 
 Product-grade packaging and integration surfaces.
 
+- **Smaller certificates** — the spend_cap proof now uses **Bulletproofs** (logarithmic size) instead of
+  bit-decomposition: a certificate shrank from ~20 KB to ~3.1 KB (~6.4x). Vendored `pcai/_bulletproof.py`.
+
 - **Tamper-evident audit log** — `pcai.audit.AuditLog`: a hash-chained record of every issued certificate
   (policy + commitments, not the hidden values); any edit/insert/delete breaks the chain. Wired into `gate`
   (optional `audit_log=`) and the HTTP service (`GET /audit`).
