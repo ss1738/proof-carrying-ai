@@ -55,4 +55,25 @@ contract SigmaVerifierTest is Test {
         bad.ms[2] = 6;
         assertFalse(v.verify(bad), "wrong allowed set must be rejected");
     }
+
+    /// Fuzz: setting any challenge scalar to a different value must make the proof fail (never verify).
+    function testFuzz_mutated_challenge_never_verifies(uint256 idx, uint256 val) public {
+        SigmaVerifier.Proof memory bad = p;
+        idx = idx % bad.e.length;
+        vm.assume(val != bad.e[idx]);
+        bad.e[idx] = val;
+        assertFalse(v.verify(bad), "mutated challenge must not verify");
+    }
+
+    /// Fuzz: shifting the commitment by any nonzero delta must fail (wrong value) or revert (off-curve).
+    function testFuzz_mutated_commitment_never_verifies(uint256 dx) public {
+        vm.assume(dx != 0);
+        SigmaVerifier.Proof memory bad = p;
+        bad.Cx = addmod(bad.Cx, dx, type(uint256).max);
+        try v.verify(bad) returns (bool ok) {
+            assertFalse(ok, "mutated commitment must not verify");
+        } catch {
+            // off-curve point -> precompile reverts -> also a rejection (fail closed)
+        }
+    }
 }
