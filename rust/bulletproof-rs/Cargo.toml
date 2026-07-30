@@ -1,0 +1,19 @@
+[package]
+name = "bulletproof-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Native (Rust) Bulletproofs range prover over secp256k1, wire-compatible with the Python bulletproof.py (same generators, serialization, and SHA256 Fiat-Shamir), so a Rust proof verifies in Python."
+
+[[bin]]
+name = "bulletproof-rs"
+path = "src/main.rs"
+
+[dependencies]
+num-bigint = { version = "0.4", features = ["rand"] }
+num-traits = "0.2"
+rand = "0.8"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 3
+lto = true
