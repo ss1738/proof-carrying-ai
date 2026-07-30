@@ -1,0 +1,14 @@
+# standing rules the coding agent cannot forget, enforced by `statute check`
+[[rule]]
+name    = "no-hardcoded-secrets"
+kind    = "forbid"
+pattern = '(sk-[A-Za-z0-9]{20}|gsk_[A-Za-z0-9]{20}|ghp_[A-Za-z0-9]{20}|-----BEGIN [A-Z ]*PRIVATE KEY)'
+glob    = "**/*.py"
+message = "no hardcoded secrets in source — read keys from env/.env (operational floor)"
+
+[[rule]]
+name    = "no-debug-dumps"
+kind    = "forbid"
+pattern = 'breakpoint\(\)'
+glob    = "pcai/**/*.py"
+message = "remove breakpoint() before committing"

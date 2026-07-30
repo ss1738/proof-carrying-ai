@@ -1,0 +1,7 @@
+# acceptance criteria for a task in this repo — the oracle decides "done"
+[[criterion]]
+name = "py-compiles"
+run  = "python3 -m py_compile $(git ls-files '*.py')"
+[[criterion]]
+name = "statute"
+run  = "statute check"
