@@ -107,8 +107,13 @@ and SHA256 Fiat-Shamir — so a **Rust-generated Bulletproofs proof verifies in 
 
 The measurement said the bottleneck was a field inversion per point-add, not the language — so the prover uses
 **Jacobian coordinates** (one inversion per scalar-mul instead of ~256). That alone gave ~7× on top of the
-~4.8× from Rust, for ~34× over Python end-to-end, with the affine serialization preserved so proofs still
-verify in Python. This is the lever the earlier benchmark pointed to, applied and measured.
+~4.8× from Rust, for ~34× over the *affine* Python baseline, with the affine serialization preserved so proofs
+still verify in Python. This is the lever the earlier benchmark pointed to, applied and measured.
+
+The same fix went into the Python group (`ec_group.py`): Jacobian coordinates cut Python Bulletproofs prove
+from 6,460→272 ms (n=16) and 12,858→540 ms (n=32) — **~24×** — since Python's per-op overhead amplified the
+inversion cost even more. Every Python EC demo (the structured certificate, EC range proofs) got faster for
+free, and `./verify.sh` still passes.
 
 ## The landmark seed: a certificate for a real agent action (`demo_structured_certificate.py`)
 
