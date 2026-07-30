@@ -116,6 +116,15 @@ def main() -> int:
     oki, _ = inc.verify(band, pub)
     checks.append(("incomplete cert (dropped rule) rejected", not oki, ""))
 
+    # 15. vacuous-range guard: a range proof claiming a huge nbits (~group order -> vacuous) is rejected.
+    #     The verifier caps nbits well below log2(q); tamper an honest proof's n to check the guard fires.
+    from pcai import _bulletproof as _bpm
+    import secrets as _s
+    Cok, okpf = _bpm.prove_le(750, _s.randbelow(_bpm.Q), 1000, 32)
+    assert _bpm.verify_le(Cok, 1000, okpf)
+    okpf_big = dict(okpf); okpf_big["n"] = 256                    # claim a vacuous range
+    checks.append(("large-nbits range proof rejected (guard)", not _bpm.verify_le(Cok, 1000, okpf_big), ""))
+
     allok = True
     for name, passed, note in checks:
         allok = allok and passed

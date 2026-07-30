@@ -141,6 +141,8 @@ def range_prove(v: int, gamma: int, n: int):
 
 def range_verify(V, proof: dict) -> bool:
     n = proof["n"]
+    if not isinstance(n, int) or not (1 <= n <= 64):
+        return False  # a range near the group order (~2^256) is vacuous; a real bound is small
     g, h, u, hb = gens(n)
     A, S = EC.deser(proof["A"]), EC.deser(proof["S"])
     T1, T2 = EC.deser(proof["T1"]), EC.deser(proof["T2"])

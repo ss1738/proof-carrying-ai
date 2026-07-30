@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3
+
+**Soundness fix (vacuous range).** The verifier now caps a range proof's `nbits` at 64. A range proof asserts a
+value lies in `[0, 2^nbits)`; with `nbits` near the group order (~2^256) that interval is essentially the whole
+field, so the bound becomes vacuous and an over-cap amount slips through. Confirmed: a forged `amount=5000` vs
+`cap=1000` verified with `nbits=256`. Now rejected in both range backends and the certificate path. Amounts are
+small, so 64 bits leaves a vast safety margin below the ~256-bit order.
+
 ## 0.3.2
 
 **Soundness fix (completeness).** `verify` now requires the certificate to carry a proof for **every** rule in

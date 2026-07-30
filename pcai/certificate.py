@@ -115,14 +115,26 @@ class Certificate:
         return True, f"signature valid AND {len(self.rules)} ZK compliance proofs verify"
 
 
+MAX_NBITS = 64  # a range must be a real bound; near the group order (~2^256) it goes vacuous, so cap it well below.
+
+
+def _bits_ok(proof: dict) -> bool:
+    n = proof.get("n", proof.get("nbits"))
+    return isinstance(n, int) and 1 <= n <= MAX_NBITS
+
+
 def _verify_rule(e: dict, commitment_hex: str) -> bool:
     C = _G.deser(commitment_hex)
     if e["type"] == "max":
+        if not _bits_ok(e["proof"]):
+            return False
         kind = e.get("kind", "bulletproofs")
         if kind == "bitwise":
             return _bitwise.verify_le(C, int(e["limit"]), e["proof"], group=_G)
         return _bp.verify_le(C, int(e["limit"]), e["proof"])
     if e["type"] == "min":
+        if not _bits_ok(e["proof"]):
+            return False
         return _bp.verify_ge(C, int(e["floor"]), e["proof"])
     if e["type"] == "in":
         allowed = tuple(_scalar(n) for n in e["set"])

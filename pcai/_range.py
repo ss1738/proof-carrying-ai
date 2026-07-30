@@ -41,6 +41,8 @@ def prove_le(amount: int, r_a: int, limit: int, nbits: int, group):
 def verify_le(C_amount, limit: int, proof: dict, group) -> bool:
     q = group.q
     nbits = proof["nbits"]
+    if not isinstance(nbits, int) or not (1 <= nbits <= 64):
+        return False  # a range near the group order is vacuous; a real bound is small
     C_bits = [group.deser(s) for s in proof["C_bits"]]
     bit_proofs = [ZKProof.from_dict(d) for d in proof["bit_proofs"]]
     if len(C_bits) != nbits or len(bit_proofs) != nbits:
