@@ -22,9 +22,8 @@ def main() -> int:
     checks = [("chain verifies", log.verify_chain())]
 
     # tamper: edit a recorded commitment -> chain breaks
-    log.entries[1]["commitments"]["amount"] = "deadbeef"
+    log.entries[1]["commitments"][0] = "deadbeef"
     checks.append(("edited entry breaks chain", not log.verify_chain()))
-    log.entries[1]["commitments"]["amount"] = log.entries[1]["hash"]  # restore-ish (still broken hash)
 
     # rebuild clean, test delete + reorder
     log2 = AuditLog()

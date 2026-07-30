@@ -202,3 +202,21 @@ def verify_le(C_amount, cap: int, proof: dict) -> bool:
         return range_verify(V, proof)
     except (ValueError, KeyError, TypeError):
         return False
+
+
+def prove_ge(value: int, r: int, floor: int, nbits: int):
+    """Prove a committed value >= floor (0 <= floor <= value < 2^nbits). Returns (C_value, proof).
+    C_value shares the blinding generator hb with the Bulletproofs commitment, so the verifier recomputes
+    V = C_value - floor*G and range-checks (value - floor) in [0, 2^n)."""
+    if not (0 <= floor <= value < (1 << nbits)):
+        raise ValueError("cannot prove a false statement: need 0 <= floor <= value < 2^nbits")
+    _V, proof = range_prove(value - floor, r % Q, nbits)   # V = (value-floor)*G + r*hb == C_value - floor*G
+    return _commit_amount(value, r), proof
+
+
+def verify_ge(C_value, floor: int, proof: dict) -> bool:
+    V = padd(C_value, EC.mul(EC.g, (Q - floor % Q) % Q))    # C_value - floor*G
+    try:
+        return range_verify(V, proof)
+    except (ValueError, KeyError, TypeError):
+        return False

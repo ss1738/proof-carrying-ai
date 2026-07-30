@@ -4,6 +4,10 @@
 
 Product-grade packaging and integration surfaces.
 
+- **General policy engine** — a policy is now a list of rules (`max`/`min` on any numeric field, `in` on any
+  categorical field), so certificates cover *any* agent action (LLM token budgets, tool allowlists, data
+  scopes), not just payments. The `spend_cap`/`allowlist`/`residency` shorthand normalizes to rules.
+
 - **Smaller certificates** — the spend_cap proof now uses **Bulletproofs** (logarithmic size) instead of
   bit-decomposition: a certificate shrank from ~20 KB to ~3.1 KB (~6.4x). Vendored `pcai/_bulletproof.py`.
 

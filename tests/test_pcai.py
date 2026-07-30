@@ -43,8 +43,8 @@ def main() -> int:
 
     # 5. tampering the commitment breaks verification
     tampered = Certificate.from_json(cert.to_json())
-    a = tampered.commitments["amount"]
-    tampered.commitments["amount"] = a[:-1] + ("0" if a[-1] != "0" else "1")  # flip last hex char
+    a = tampered.rules[0]["commitment"]
+    tampered.rules[0]["commitment"] = a[:-1] + ("0" if a[-1] != "0" else "1")  # flip last hex char
     okt, _ = tampered.verify(POLICY, pub)
     checks.append(("tampered commitment rejected", not okt, ""))
 
@@ -69,6 +69,30 @@ def main() -> int:
         checks.append(("wrong region refused", False, "issued a false certificate"))
     except ValueError:
         checks.append(("wrong region refused", True, ""))
+
+    # 10. GENERAL policy over non-payment fields: an LLM tool call with a token budget + tool allowlist + min
+    gpol = {"rules": [
+        {"type": "max", "field": "tokens", "limit": 100_000},
+        {"type": "min", "field": "tokens", "floor": 1},
+        {"type": "in", "field": "tool", "set": ["read", "search", "summarize"]},
+    ]}
+    gcert = issue({"tokens": 42_000, "tool": "search"}, gpol, key)
+    okg, whyg = gcert.verify(gpol, pub)
+    checks.append(("general non-payment policy verifies", okg and "3 ZK" in whyg, whyg))
+
+    # 11. over-budget tokens refused
+    try:
+        issue({"tokens": 500_000, "tool": "search"}, gpol, key)
+        checks.append(("over-budget refused", False, "issued a false certificate"))
+    except ValueError:
+        checks.append(("over-budget refused", True, ""))
+
+    # 12. disallowed tool refused
+    try:
+        issue({"tokens": 100, "tool": "delete_all"}, gpol, key)
+        checks.append(("disallowed tool refused", False, "issued a false certificate"))
+    except ValueError:
+        checks.append(("disallowed tool refused", True, ""))
 
     allok = True
     for name, passed, note in checks:

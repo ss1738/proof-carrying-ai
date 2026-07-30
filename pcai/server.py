@@ -54,23 +54,25 @@ def _make_handler(key, audit: AuditLog | None = None):
                 req = self._read()
             except (ValueError, json.JSONDecodeError):
                 return self._send(400, {"error": "invalid JSON"})
-            if self.path == "/certify":
-                try:
-                    cert = issue(req["action"], req["policy"], key)
-                except ValueError as e:
-                    return self._send(422, {"error": str(e), "certifiable": False})
-                except (KeyError, TypeError) as e:
-                    return self._send(400, {"error": f"bad request: {e}"})
-                audit.record(cert)
-                return self._send(200, json.loads(cert.to_json()))
-            if self.path == "/verify":
-                try:
+            try:
+                if self.path == "/certify":
+                    if not isinstance(req, dict) or not isinstance(req.get("action"), dict) or not isinstance(req.get("policy"), dict):
+                        return self._send(400, {"error": "expected {action: {...}, policy: {...}}"})
+                    try:
+                        cert = issue(req["action"], req["policy"], key)
+                    except ValueError as e:
+                        return self._send(422, {"error": str(e), "certifiable": False})
+                    audit.record(cert)
+                    return self._send(200, json.loads(cert.to_json()))
+                if self.path == "/verify":
+                    if not isinstance(req, dict) or not isinstance(req.get("certificate"), dict) or not isinstance(req.get("policy"), dict):
+                        return self._send(400, {"error": "expected {certificate: {...}, policy: {...}}"})
                     cert = Certificate.from_json(json.dumps(req["certificate"]))
                     ok, reason = cert.verify(req["policy"], req.get("pubkey", pub))
-                except (KeyError, TypeError, ValueError) as e:
-                    return self._send(400, {"error": f"bad request: {e}"})
-                return self._send(200, {"valid": ok, "reason": reason})
-            self._send(404, {"error": "not found"})
+                    return self._send(200, {"valid": ok, "reason": reason})
+                return self._send(404, {"error": "not found"})
+            except Exception as e:  # any unexpected input -> fail closed with 400, never 500
+                return self._send(400, {"error": f"bad request: {type(e).__name__}"})
 
     return Handler
 
