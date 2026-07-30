@@ -43,6 +43,19 @@ The bridge from "in the allowed set" to "compliant with the policy" is **machine
 - **Replay.** Certificates are not nonce-bound by default; an integrator that needs anti-replay must bind a
   nonce/context into the policy `domain`.
 
+## Self-audit (pre-external-review)
+
+A self-audit of the general rule engine found and fixed three soundness gaps (each confirmed exploitable, then
+regression-tested). They are recorded here in the spirit of honest disclosure — and as a reminder that an
+*external* audit is expected to find more:
+
+- **Band binding** (0.3.1) — two rules on the same field (e.g. min/max) were committed separately, so nothing
+  bound them to the same value. Fixed: each field is committed once, shared across its rules.
+- **Completeness** (0.3.2) — `verify` didn't check the certificate proves *every* policy rule; a re-signed
+  cert could drop a rule. Fixed: proven rules must equal the policy.
+- **Vacuous range** (0.3.3) — a range proof with `nbits` near the group order makes the interval the whole
+  field, so an over-cap amount passed. Fixed: `nbits` is capped at 64.
+
 ## Reporting a vulnerability
 
 Please report security issues privately to the maintainer (see the GitHub profile) rather than opening a
