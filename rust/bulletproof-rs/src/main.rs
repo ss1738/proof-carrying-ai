@@ -30,42 +30,101 @@ fn inv_p(x: &BigUint, pp: &BigUint) -> BigUint {
 }
 
 fn padd(a: &Pt, b: &Pt, pp: &BigUint) -> Pt {
-    match (a, b) {
-        (None, _) => b.clone(),
-        (_, None) => a.clone(),
-        (Some((x1, y1)), Some((x2, y2))) => {
-            if x1 == x2 && (y1 + y2) % pp == BigUint::zero() {
-                return None;
-            }
-            let s = if a == b {
-                let num = (3u32 * x1 * x1) % pp;
-                let den = inv_p(&((2u32 * y1) % pp), pp);
-                (num * den) % pp
-            } else {
-                let num = (y2 + pp - y1) % pp;
-                let den = inv_p(&((x2 + pp - x1) % pp), pp);
-                (num * den) % pp
-            };
-            let x3 = (&s * &s + pp - x1 % pp + pp - x2 % pp) % pp;
-            let y3 = (&s * ((x1 + pp - &x3) % pp) + pp - y1 % pp) % pp;
-            Some((x3, y3))
-        }
-    }
+    // affine wrapper over the Jacobian adder (defined below); one inversion at the boundary.
+    to_affine(&jac_add(&jac_from(a), &jac_from(b), pp), pp)
 }
 
-fn pmul(k: &BigUint, base: &Pt, pp: &BigUint) -> Pt {
+// ---- Jacobian coordinates (X,Y,Z), affine (x,y)=(X/Z^2, Y/Z^3); Z=0 is identity. secp256k1 a=0. ----
+// One field inversion per scalar-mul (at to_affine) instead of one per point-add -- the measured bottleneck.
+type Jac = (BigUint, BigUint, BigUint);
+
+fn jac_id() -> Jac {
+    (BigUint::one(), BigUint::one(), BigUint::zero())
+}
+fn jac_from(pt: &Pt) -> Jac {
+    match pt {
+        None => jac_id(),
+        Some((x, y)) => (x.clone(), y.clone(), BigUint::one()),
+    }
+}
+fn msub(a: &BigUint, b: &BigUint, pp: &BigUint) -> BigUint {
+    ((a % pp) + pp - (b % pp)) % pp
+}
+fn jac_double(pt: &Jac, pp: &BigUint) -> Jac {
+    let (x, y, z) = pt;
+    if z.is_zero() {
+        return jac_id();
+    }
+    let aa = (x * x) % pp;
+    let bb = (y * y) % pp;
+    let cc = (&bb * &bb) % pp;
+    let xb = (x + &bb) % pp;
+    let d = (2u32 * msub(&msub(&(&xb * &xb % pp), &aa, pp), &cc, pp)) % pp;
+    let e = (3u32 * &aa) % pp;
+    let f = (&e * &e) % pp;
+    let x3 = msub(&f, &((2u32 * &d) % pp), pp);
+    let y3 = msub(&(&e * msub(&d, &x3, pp) % pp), &((8u32 * &cc) % pp), pp);
+    let z3 = (2u32 * y * z) % pp;
+    (x3, y3, z3)
+}
+fn jac_add(p1: &Jac, p2: &Jac, pp: &BigUint) -> Jac {
+    if p1.2.is_zero() {
+        return p2.clone();
+    }
+    if p2.2.is_zero() {
+        return p1.clone();
+    }
+    let (x1, y1, z1) = p1;
+    let (x2, y2, z2) = p2;
+    let z1z1 = (z1 * z1) % pp;
+    let z2z2 = (z2 * z2) % pp;
+    let u1 = (x1 * &z2z2) % pp;
+    let u2 = (x2 * &z1z1) % pp;
+    let s1 = (y1 * z2 % pp * &z2z2) % pp;
+    let s2 = (y2 * z1 % pp * &z1z1) % pp;
+    if u1 == u2 {
+        if s1 == s2 {
+            return jac_double(p1, pp);
+        }
+        return jac_id();
+    }
+    let h = msub(&u2, &u1, pp);
+    let hh = (&h * &h) % pp;
+    let hhh = (&h * &hh) % pp;
+    let rr = msub(&s2, &s1, pp);
+    let v = (&u1 * &hh) % pp;
+    let x3 = msub(&msub(&(&rr * &rr % pp), &hhh, pp), &((2u32 * &v) % pp), pp);
+    let y3 = msub(&(&rr * msub(&v, &x3, pp) % pp), &(&s1 * &hhh % pp), pp);
+    let z3 = (&h * z1 % pp * z2) % pp;
+    (x3, y3, z3)
+}
+fn to_affine(j: &Jac, pp: &BigUint) -> Pt {
+    if j.2.is_zero() {
+        return None;
+    }
+    let zi = inv_p(&j.2, pp);
+    let zi2 = (&zi * &zi) % pp;
+    let zi3 = (&zi2 * &zi) % pp;
+    Some(((&j.0 * &zi2) % pp, (&j.1 * &zi3) % pp))
+}
+
+fn jac_mul(k: &BigUint, base: &Pt, pp: &BigUint) -> Jac {
     let n = order();
     let mut k = k % &n;
-    let mut acc: Pt = None;
-    let mut cur = base.clone();
+    let mut acc = jac_id();
+    let mut cur = jac_from(base);
     while !k.is_zero() {
         if (&k & BigUint::one()) == BigUint::one() {
-            acc = padd(&acc, &cur, pp);
+            acc = jac_add(&acc, &cur, pp);
         }
-        cur = padd(&cur, &cur, pp);
+        cur = jac_double(&cur, pp);
         k >>= 1;
     }
     acc
+}
+
+fn pmul(k: &BigUint, base: &Pt, pp: &BigUint) -> Pt {
+    to_affine(&jac_mul(k, base, pp), pp)
 }
 
 fn ser(pt: &Pt) -> String {
@@ -133,11 +192,11 @@ fn gens(n: usize, pp: &BigUint) -> (Vec<Pt>, Vec<Pt>, Pt, Pt) {
 
 fn multiexp(scalars: &[BigUint], points: &[Pt], pp: &BigUint) -> Pt {
     let n = order();
-    let mut acc: Pt = None;
+    let mut acc = jac_id();
     for (s, pt) in scalars.iter().zip(points.iter()) {
-        acc = padd(&acc, &pmul(&(s % &n), pt, pp), pp);
+        acc = jac_add(&acc, &jac_mul(&(s % &n), pt, pp), pp);
     }
-    acc
+    to_affine(&acc, pp)
 }
 
 fn vec_ip(a: &[BigUint], b: &[BigUint], n: &BigUint) -> BigUint {
