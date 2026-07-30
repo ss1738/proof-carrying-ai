@@ -1,0 +1,18 @@
+[package]
+name = "zkcore-gmp"
+version = "0.1.0"
+edition = "2021"
+description = "GMP-backed (rug) prover/verifier for qedra's Sigma OR-proof + range proof. Same protocol and Fiat-Shamir encoding as zkcore/Python; GMP assembly modmul for maximum speed."
+
+[[bin]]
+name = "zkcore-gmp"
+path = "src/main.rs"
+
+[dependencies]
+rug = "1.24"
+rand = "0.8"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 3
+lto = true
