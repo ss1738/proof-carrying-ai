@@ -65,11 +65,12 @@ contract SigmaVerifierTest is Test {
         assertFalse(v.verify(bad), "mutated challenge must not verify");
     }
 
-    /// Fuzz: shifting the commitment by any nonzero delta must fail (wrong value) or revert (off-curve).
-    function testFuzz_mutated_commitment_never_verifies(uint256 dx) public {
-        vm.assume(dx != 0);
+    /// Fuzz: replacing the commitment x-coord with any different value must fail (wrong point) or revert
+    /// (off-curve -- almost always, since a random x rarely lies on the curve).
+    function testFuzz_mutated_commitment_never_verifies(uint256 cx) public {
+        vm.assume(cx != p.Cx);
         SigmaVerifier.Proof memory bad = p;
-        bad.Cx = addmod(bad.Cx, dx, type(uint256).max);
+        bad.Cx = cx;
         try v.verify(bad) returns (bool ok) {
             assertFalse(ok, "mutated commitment must not verify");
         } catch {
