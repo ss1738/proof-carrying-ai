@@ -14,3 +14,6 @@ run  = "specforge run specforge/zk_range_soundness.py 12"
 [[criterion]]
 name = "soundness-membership"
 run  = "specforge run specforge/or_proof_soundness.py 12"
+[[criterion]]
+name = "soundness-bulletproof"
+run  = "specforge run specforge/bulletproof_soundness.py 8"
