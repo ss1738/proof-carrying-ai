@@ -39,6 +39,9 @@ def main(argv=None) -> int:
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8787)
 
+    b = sub.add_parser("bench", help="measure issue/verify time and certificate size for both backends")
+    b.add_argument("-n", type=int, default=10, help="repetitions")
+
     c = sub.add_parser("certify", help="issue a certificate for an agent action")
     c.add_argument("--amount", type=int, required=True)
     c.add_argument("--counterparty", required=True)
@@ -65,6 +68,27 @@ def main(argv=None) -> int:
     if args.cmd == "serve":
         from .server import serve
         serve(_load_or_create_key(args.key), args.host, args.port)
+        return 0
+
+    if args.cmd == "bench":
+        import time
+        from . import issue
+        key = _load_or_create_key(args.key)
+        pub = key.public_key().public_bytes_raw().hex()
+        policy = {"spend_cap": 1000, "allowlist": ["alice", "bob"]}
+        action = {"amount": 750, "counterparty": "alice"}
+        print(f"{'backend':13} {'issue (ms)':>11} {'verify (ms)':>12} {'size (B)':>10}  (n={args.n}, MEASURED)")
+        for kind in ("bulletproofs", "bitwise"):
+            t0 = time.perf_counter()
+            for _ in range(args.n):
+                cert = issue(action, policy, key, range_proof=kind)
+            it = (time.perf_counter() - t0) / args.n * 1000
+            t0 = time.perf_counter()
+            for _ in range(args.n):
+                cert.verify(policy, pub)
+            vt = (time.perf_counter() - t0) / args.n * 1000
+            size = len(cert.to_json(indent=None).encode())
+            print(f"{kind:13} {it:>11.0f} {vt:>12.0f} {size:>10,}")
         return 0
 
     if args.cmd == "certify":
