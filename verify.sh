@@ -22,6 +22,7 @@ py live_agent_bridge.py
 py tests/test_pcai.py
 py tests/test_server.py
 py tests/test_audit.py
+py tests/test_robustness.py
 py examples/agent_payment.py
 if command -v forge >/dev/null 2>&1 && [ -d onchain/lib/forge-std ]; then
   echo "On-chain verifier (forge):"
