@@ -43,8 +43,9 @@ def main() -> int:
 
     # 5. tampering the commitment breaks verification
     tampered = Certificate.from_json(cert.to_json())
-    a = tampered.rules[0]["commitment"]
-    tampered.rules[0]["commitment"] = a[:-1] + ("0" if a[-1] != "0" else "1")  # flip last hex char
+    fld = next(iter(tampered.commitments))
+    a = tampered.commitments[fld]
+    tampered.commitments[fld] = a[:-1] + ("0" if a[-1] != "0" else "1")  # flip last hex char
     okt, _ = tampered.verify(POLICY, pub)
     checks.append(("tampered commitment rejected", not okt, ""))
 
@@ -93,6 +94,19 @@ def main() -> int:
         checks.append(("disallowed tool refused", False, "issued a false certificate"))
     except ValueError:
         checks.append(("disallowed tool refused", True, ""))
+
+    # 13. band (max+min on the SAME field) shares ONE commitment -> rules bound to the same hidden value
+    band = {"rules": [{"type": "max", "field": "amount", "limit": 1000}, {"type": "min", "field": "amount", "floor": 100}]}
+    bcert = issue({"amount": 500}, band, key)
+    okb, _ = bcert.verify(band, pub)
+    one_commitment = len(bcert.commitments) == 1 and "amount" in bcert.commitments
+    checks.append(("band shares one commitment + verifies (soundness fix)", okb and one_commitment, ""))
+    # below the floor -> refused
+    try:
+        issue({"amount": 50}, band, key)
+        checks.append(("below band floor refused", False, "issued a false certificate"))
+    except ValueError:
+        checks.append(("below band floor refused", True, ""))
 
     allok = True
     for name, passed, note in checks:
