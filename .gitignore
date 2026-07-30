@@ -17,3 +17,5 @@ onchain/cache/
 status.json
 .verify-gate.d/
 fuzz/logs/
+
+.ordeal/
