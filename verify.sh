@@ -24,6 +24,7 @@ py tests/test_server.py
 py tests/test_audit.py
 py tests/test_robustness.py
 py examples/agent_payment.py
+py examples/agent_llm_tool.py
 if command -v forge >/dev/null 2>&1 && [ -d onchain/lib/forge-std ]; then
   echo "On-chain verifier (forge):"
   printf "  Sol  %-22s " "SigmaVerifier.sol"
