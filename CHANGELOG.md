@@ -4,6 +4,10 @@
 
 Product-grade packaging and integration surfaces.
 
+- **Tamper-evident audit log** — `pcai.audit.AuditLog`: a hash-chained record of every issued certificate
+  (policy + commitments, not the hidden values); any edit/insert/delete breaks the chain. Wired into `gate`
+  (optional `audit_log=`) and the HTTP service (`GET /audit`).
+
 - **Self-contained package** — vendored the ZK core (`pcai/_zkcore.py`, `_ec.py`, `_range.py`); removed the
   external `~/agent-guardrail` path dependency. `pip install .` needs only `cryptography`.
 - **HTTP service** — `pcai serve` (`POST /certify`, `POST /verify`, `GET /health`), zero-dependency stdlib.

@@ -16,11 +16,13 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from .audit import AuditLog
 from .certificate import Certificate, issue
 
 
-def _make_handler(key):
+def _make_handler(key, audit: AuditLog | None = None):
     pub = key.public_key().public_bytes_raw().hex()
+    audit = audit if audit is not None else AuditLog()
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code, obj):
@@ -41,6 +43,9 @@ def _make_handler(key):
         def do_GET(self):
             if self.path == "/health":
                 self._send(200, {"status": "ok", "pubkey": pub, "service": "pcai"})
+            elif self.path == "/audit":
+                self._send(200, {"count": len(audit.entries), "head": audit.head,
+                                 "chain_verifies": audit.verify_chain()})
             else:
                 self._send(404, {"error": "not found"})
 
@@ -56,6 +61,7 @@ def _make_handler(key):
                     return self._send(422, {"error": str(e), "certifiable": False})
                 except (KeyError, TypeError) as e:
                     return self._send(400, {"error": f"bad request: {e}"})
+                audit.record(cert)
                 return self._send(200, json.loads(cert.to_json()))
             if self.path == "/verify":
                 try:
