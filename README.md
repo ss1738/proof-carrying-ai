@@ -236,10 +236,15 @@ a homomorphic bind):
 | spend_cap (range, n=16) | `RangeVerifier.verifyRange` | ~1,228,456 |
 
 Every tamper — the commitment, a challenge scalar, the allowed set, the amount, or the limit — is rejected
-(an off-curve point fails closed via the precompile). The range verifier is O(n) gas (bit-decomposition); a
-Bulletproofs on-chain verifier would cut it to O(log n) and is the natural next optimization. This is the
-concrete "verifiable agent action for Ethereum smart accounts" deliverable. Run it:
+(an off-curve point fails closed via the precompile). This is the concrete "verifiable agent action for
+Ethereum smart accounts" deliverable. Run it:
 `cd onchain && forge install foundry-rs/forge-std && python3 onchain_prove.py && forge test -vv`.
+
+`onchain/onchain_bulletproof.py` is a **BN254 Bulletproofs range prover** (the Ethereum-native curve, same
+protocol as the secp256k1 one, SHA256 byte-Fiat-Shamir a Solidity verifier can recompute). The honest reason
+it matters on-chain is **calldata**, not compute: at n=16 a Bulletproofs proof is ~864 B vs the
+bit-decomposition's ~4,704 B (**~5.4× smaller calldata**), but verification still touches all n generators
+(an O(n) multiexp), so it is not O(log n) *gas*. The Solidity Bulletproofs verifier is the follow-on.
 
 ## Why it's defensible
 
