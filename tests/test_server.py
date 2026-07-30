@@ -49,6 +49,10 @@ def main() -> int:
     code, res = _post(base + "/verify", {"certificate": cert, "policy": {"spend_cap": 1000, "allowlist": ["x"]}})
     checks.append(("mismatched policy -> invalid", res["valid"] is False))
 
+    with urllib.request.urlopen(base + "/audit") as r:
+        audit = json.loads(r.read())
+    checks.append(("audit trail records certs + verifies", audit["count"] == 1 and audit["chain_verifies"]))
+
     srv.shutdown()
     allok = all(p for _, p in checks)
     for name, p in checks:

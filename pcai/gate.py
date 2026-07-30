@@ -28,9 +28,10 @@ class GatedResult:
     certificate: Certificate
 
 
-def gate(policy: dict, signing_key):
+def gate(policy: dict, signing_key, audit_log=None):
     """Decorator: gate an action function `fn(action: dict, ...)` on `policy`. Issues a certificate BEFORE
-    running fn (a non-compliant action cannot be certified, so it is blocked before execution)."""
+    running fn (a non-compliant action cannot be certified, so it is blocked before execution). If an
+    `audit_log` (pcai.audit.AuditLog) is given, every certified action is appended to its tamper-evident chain."""
     def deco(fn):
         @wraps(fn)
         def wrapper(action: dict, *args, **kwargs) -> GatedResult:
@@ -38,6 +39,8 @@ def gate(policy: dict, signing_key):
                 cert = issue(action, policy, signing_key)   # proves compliance, or raises
             except ValueError as e:
                 raise PolicyViolation(str(e)) from None
+            if audit_log is not None:
+                audit_log.record(cert)
             result = fn(action, *args, **kwargs)             # only runs if certified
             return GatedResult(result=result, certificate=cert)
         return wrapper
