@@ -12,3 +12,5 @@ rust/**/target/
 onchain/lib/
 onchain/out/
 onchain/cache/
+.*.aux
+*.aux
