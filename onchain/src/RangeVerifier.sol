@@ -43,9 +43,13 @@ contract RangeVerifier is BN254Sigma {
     }
 
     /// @notice Verify that C_amount hides a value <= limit (0 <= amount <= limit < 2^nbits).
+    // A range must be a real bound. With ~254-bit R, a proof over ~254 bits spans nearly the whole field, so
+    // the interval [0, 2^n) becomes vacuous and an over-cap amount would pass. Cap n well below log2(R).
+    uint256 internal constant MAX_BITS = 64;
+
     function verifyRange(RangeProof calldata p) external view returns (bool) {
         uint256 n = p.bits.length;
-        if (n == 0 || p.domains.length != n) return false;
+        if (n == 0 || n > MAX_BITS || p.domains.length != n) return false;
 
         for (uint256 i = 0; i < n; i++) {
             if (!_bitOK(p.domains[i], p.bits[i])) return false;

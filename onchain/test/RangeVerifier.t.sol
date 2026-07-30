@@ -66,4 +66,19 @@ contract RangeVerifierTest is Test {
         bad.limit = rp.limit + 1; // homomorphic bind no longer holds
         assertFalse(v.verifyRange(bad), "tampered limit must be rejected");
     }
+
+    function test_vacuous_too_many_bits_rejected() public {
+        // a range proof over > MAX_BITS (64) bits approaches the group order -> vacuous; must be rejected
+        // by the bit-count cap, before any per-bit work. Pad to 65 dummy bits.
+        RangeVerifier.RangeProof memory big = rp;
+        RangeVerifier.BitProof[] memory bits = new RangeVerifier.BitProof[](65);
+        bytes32[] memory doms = new bytes32[](65);
+        for (uint256 i = 0; i < 65; i++) {
+            bits[i] = rp.bits[0];
+            doms[i] = rp.domains[0];
+        }
+        big.bits = bits;
+        big.domains = doms;
+        assertFalse(v.verifyRange(big), "range proof over 64 bits must be rejected (vacuous)");
+    }
 }
