@@ -25,6 +25,27 @@ Runnable demos (python):
 ALL CHECKS PASSED
 ```
 
+## Use it: the `pcai` library + CLI
+
+The pieces come together as one installable tool. `pcai.issue(action, policy, key)` takes an agent action
+with *sensitive* fields (amount, counterparty), checks it against a policy, and returns a `Certificate` that
+proves compliance in zero knowledge (spend_cap range proof + allowlist membership proof) plus an Ed25519
+signature. `Certificate.verify(policy, pubkey)` re-checks everything from public data alone — the amount and
+counterparty are never revealed.
+
+```bash
+pip install -e .
+pcai keygen                                                    # -> public key
+pcai certify --amount 750 --counterparty alice \
+             --cap 1000 --allow alice,bob --out cert.json       # ALLOW -> signed ZK certificate
+pcai verify cert.json --cap 1000 --allow alice,bob --pubkey <hex>
+#   VALID: signature valid AND both ZK compliance proofs verify
+pcai certify --amount 5000 ...                                  # REFUSED: a non-compliant action can't be certified
+```
+
+`tests/test_pcai.py` covers the round trip end to end: a compliant action issues and verifies, an over-cap or
+non-allowlisted action is refused, and a tampered commitment / wrong key / mismatched policy is rejected.
+
 ## The two layers of a certificate
 
 An agent proposes an action. Instead of trusting the agent or the operator, we attach a certificate with two

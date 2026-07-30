@@ -1,0 +1,20 @@
+[project]
+name = "pcai"
+version = "0.1.0"
+description = "Proof-carrying compliance certificates for AI agent actions: zero-knowledge proofs that an action obeyed a formal policy, verifiable by anyone."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "cryptography>=41",
+]
+
+[project.scripts]
+pcai = "pcai.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pcai"]
