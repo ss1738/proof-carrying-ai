@@ -43,8 +43,11 @@ pcai verify cert.json --cap 1000 --allow alice,bob --pubkey <hex>
 pcai certify --amount 5000 ...                                  # REFUSED: a non-compliant action can't be certified
 ```
 
-`tests/test_pcai.py` covers the round trip end to end: a compliant action issues and verifies, an over-cap or
-non-allowlisted action is refused, and a tampered commitment / wrong key / mismatched policy is rejected.
+Add `--regions EU,UK --region UK` to also prove **residency** in zero knowledge (a third membership proof).
+
+`tests/test_pcai.py` covers the round trip end to end (9 checks): a compliant action issues and verifies
+(2 or 3 ZK proofs), an over-cap / non-allowlisted / wrong-region action is refused, and a tampered commitment
+/ wrong key / mismatched policy is rejected.
 
 ## The two layers of a certificate
 

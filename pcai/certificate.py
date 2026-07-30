@@ -39,7 +39,22 @@ def _scalar(name: str) -> int:
 
 
 def _canon_policy(p: dict) -> dict:
-    return {"spend_cap": int(p["spend_cap"]), "allowlist": sorted(str(x) for x in p["allowlist"])}
+    return {"spend_cap": int(p["spend_cap"]),
+            "allowlist": sorted(str(x) for x in p["allowlist"]),
+            "residency": sorted(str(x) for x in p.get("residency", []))}
+
+
+def _prove_membership(name: str, allowed_names, tag: str):
+    """Commit `name` (as a scalar) and prove it is in `allowed_names`, in zero knowledge. Returns (C_hex, proof_dict)."""
+    allowed = tuple(_scalar(n) for n in allowed_names)
+    r = secrets.randbelow(Q)
+    proof, C = zk_core.prove(_G, allowed, _scalar(name), r, "allow", tag)
+    return _G.ser(C), proof.to_dict()
+
+
+def _verify_membership(C_hex: str, allowed_names, proof_dict: dict, tag: str) -> bool:
+    allowed = tuple(_scalar(n) for n in allowed_names)
+    return zk_core.verify(_G, allowed, _G.deser(C_hex), ZKProof.from_dict(proof_dict), tag)
 
 
 def policy_id(policy: dict) -> str:
@@ -93,13 +108,17 @@ class Certificate:
             Ca = _G.deser(self.commitments["amount"])
             if not zk_range.verify_le(Ca, cap, self.proofs["spend_cap"], group=_G):
                 return False, "spend_cap ZK range proof does not verify"
-            allowed = tuple(_scalar(n) for n in policy["allowlist"])
-            Ccp = _G.deser(self.commitments["counterparty"])
-            if not zk_core.verify(_G, allowed, Ccp, ZKProof.from_dict(self.proofs["allowlist"]), "pcai/allowlist"):
+            if not _verify_membership(self.commitments["counterparty"], policy["allowlist"],
+                                      self.proofs["allowlist"], "pcai/allowlist"):
                 return False, "allowlist ZK membership proof does not verify"
+            regions = policy.get("residency", [])
+            if regions and not _verify_membership(self.commitments["region"], regions,
+                                                  self.proofs["residency"], "pcai/residency"):
+                return False, "residency ZK membership proof does not verify"
         except (ValueError, TypeError, KeyError):
             return False, "malformed commitment or proof (fails closed)"
-        return True, "signature valid AND both ZK compliance proofs verify"
+        rules = "3 ZK compliance proofs" if policy.get("residency") else "2 ZK compliance proofs"
+        return True, f"signature valid AND {rules} verify"
 
 
 def _canonical(body: dict) -> bytes:
@@ -113,25 +132,25 @@ def issue(action: dict, policy: dict, signing_key, nbits: int = 32) -> Certifica
     amount = int(action["amount"])
     counterparty = str(action["counterparty"])
     allowed_names = list(policy["allowlist"])
+    regions = list(policy.get("residency", []))
 
     if not (0 <= amount <= cap < (1 << nbits)):
         raise ValueError("spend_cap violated: amount not in [0, cap]")
     if counterparty not in allowed_names:
         raise ValueError("allowlist violated: counterparty not permitted")
+    if regions and str(action.get("region")) not in regions:
+        raise ValueError("residency violated: region not permitted")
 
     r_a = secrets.randbelow(Q)
     Ca, range_pf = zk_range.prove_le(amount, r_a, cap, nbits, group=_G)
-    cp = _scalar(counterparty)
-    allowed = tuple(_scalar(n) for n in allowed_names)
-    r_c = secrets.randbelow(Q)
-    memb, Ccp = zk_core.prove(_G, allowed, cp, r_c, "allow", "pcai/allowlist")
+    Ccp_hex, memb = _prove_membership(counterparty, allowed_names, "pcai/allowlist")
 
-    cert = Certificate(
-        verdict="ALLOW",
-        policy=_canon_policy(policy),
-        commitments={"amount": _G.ser(Ca), "counterparty": _G.ser(Ccp)},
-        proofs={"spend_cap": range_pf, "allowlist": memb.to_dict()},
-    )
+    commitments = {"amount": _G.ser(Ca), "counterparty": Ccp_hex}
+    proofs = {"spend_cap": range_pf, "allowlist": memb}
+    if regions:
+        commitments["region"], proofs["residency"] = _prove_membership(str(action["region"]), regions, "pcai/residency")
+
+    cert = Certificate(verdict="ALLOW", policy=_canon_policy(policy), commitments=commitments, proofs=proofs)
     cert.signature = signing_key.sign(_canonical(cert.body())).hex()
     cert.pubkey = signing_key.public_key().public_bytes_raw().hex()
     return cert

@@ -40,12 +40,15 @@ def main(argv=None) -> int:
     c.add_argument("--counterparty", required=True)
     c.add_argument("--cap", type=int, required=True)
     c.add_argument("--allow", required=True, help="comma-separated allowlist")
+    c.add_argument("--region", help="the action's region (only if --regions is given)")
+    c.add_argument("--regions", help="comma-separated allowed regions (residency rule)")
     c.add_argument("--out", help="write certificate JSON here (default: stdout)")
 
     v = sub.add_parser("verify", help="verify a certificate")
     v.add_argument("cert")
     v.add_argument("--cap", type=int, required=True)
     v.add_argument("--allow", required=True)
+    v.add_argument("--regions", help="comma-separated allowed regions (must match certify)")
     v.add_argument("--pubkey", required=True)
 
     args = ap.parse_args(argv)
@@ -58,8 +61,12 @@ def main(argv=None) -> int:
     if args.cmd == "certify":
         key = _load_or_create_key(args.key)
         policy = {"spend_cap": args.cap, "allowlist": args.allow.split(",")}
+        action = {"amount": args.amount, "counterparty": args.counterparty}
+        if args.regions:
+            policy["residency"] = args.regions.split(",")
+            action["region"] = args.region
         try:
-            cert = issue({"amount": args.amount, "counterparty": args.counterparty}, policy, key)
+            cert = issue(action, policy, key)
         except ValueError as e:
             print(f"REFUSED: {e} (a non-compliant action cannot be certified)", file=sys.stderr)
             return 1
@@ -74,6 +81,8 @@ def main(argv=None) -> int:
     if args.cmd == "verify":
         cert = Certificate.from_json(open(args.cert).read())
         policy = {"spend_cap": args.cap, "allowlist": args.allow.split(",")}
+        if args.regions:
+            policy["residency"] = args.regions.split(",")
         ok, reason = cert.verify(policy, args.pubkey)
         print(f"{'VALID' if ok else 'INVALID'}: {reason}")
         return 0 if ok else 1
