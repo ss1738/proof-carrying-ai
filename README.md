@@ -77,6 +77,19 @@ pcai certify --amount 5000 ...                                  # REFUSED: a non
 
 Add `--regions EU,UK --region UK` to also prove **residency** in zero knowledge (a third membership proof).
 
+**Any action, not just payments.** A policy is a list of rules over *any* field — `max`/`min` on a numeric
+field (a ZK range proof) and `in` on a categorical field (a ZK membership proof). The payment shorthand is
+just sugar. For example, gating an LLM tool call on a token budget and a tool allowlist:
+
+```python
+policy = {"rules": [
+    {"type": "max", "field": "tokens", "limit": 100_000},
+    {"type": "in",  "field": "tool",   "set": ["read", "search", "summarize"]},
+]}
+issue({"tokens": 42_000, "tool": "search"}, policy, key)   # ALLOW, both proven in ZK
+issue({"tokens": 500_000, "tool": "search"}, policy, key)  # ValueError: over budget, cannot be certified
+```
+
 **Self-contained.** The `pcai` package vendors its ZK core, so `pip install .` needs only `cryptography` — no
 external path, no cloned dependency. (The repository's *reference demos* still use [qedra](https://github.com/ss1738/agent-guardrail);
 the installable product does not.)

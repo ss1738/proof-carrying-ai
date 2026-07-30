@@ -30,7 +30,7 @@ class AuditLog:
         body = {
             "prev": self.head,
             "policy": cert.policy,
-            "commitments": cert.commitments,
+            "commitments": [e.get("commitment") for e in cert.rules],
             "verdict": cert.verdict,
             "pubkey": cert.pubkey,
             "time": round(at if at is not None else time.time(), 3),
