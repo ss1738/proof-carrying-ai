@@ -1,5 +1,8 @@
 # proof-carrying-ai
 
+[![verify](https://github.com/ss1738/proof-carrying-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ss1738/proof-carrying-ai/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **A proof-carrying compliance certificate for AI agent actions:** an agent action ships with a certificate
 that proves it obeyed a formal policy — a *machine-checked* soundness proof plus a *zero-knowledge* proof —
 verifiable by anyone with public data alone, and unforgeable for a non-compliant action.
