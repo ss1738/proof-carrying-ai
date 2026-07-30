@@ -7,6 +7,8 @@ pcai/_range.py
 pcai/_zkcore.py
 pcai/certificate.py
 pcai/cli.py
+pcai/gate.py
+pcai/server.py
 pcai.egg-info/PKG-INFO
 pcai.egg-info/SOURCES.txt
 pcai.egg-info/dependency_links.txt
@@ -14,3 +16,4 @@ pcai.egg-info/entry_points.txt
 pcai.egg-info/requires.txt
 pcai.egg-info/top_level.txt
 tests/test_pcai.py
+tests/test_server.py
