@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+**Soundness fix.** A field is now committed **once** and shared across all its rules. Previously a policy with
+two rules on the same field (e.g. a min/max band) committed the field separately per rule, so nothing bound
+them to the same hidden value -- a crafted certificate could prove the bounds against *different* values. Now
+the verifier checks every same-field rule against one commitment, so bands are enforced. Found by inspection,
+live in the LLM example; added a regression test.
+
 ## 0.3.0
 
 General policy engine + full CLI/service parity.

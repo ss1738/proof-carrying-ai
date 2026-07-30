@@ -67,12 +67,13 @@ def _canonical(body: dict) -> bytes:
 class Certificate:
     verdict: str
     policy: list  # normalized rule list
-    rules: list = field(default_factory=list)  # per-rule proof material
+    commitments: dict = field(default_factory=dict)  # field -> ONE commitment (shared across its rules)
+    rules: list = field(default_factory=list)  # per-rule proof material (references its field's commitment)
     signature: str = ""
     pubkey: str = ""
 
     def body(self) -> dict:
-        return {"verdict": self.verdict, "policy": self.policy, "rules": self.rules}
+        return {"verdict": self.verdict, "policy": self.policy, "commitments": self.commitments, "rules": self.rules}
 
     def to_json(self, indent=2) -> str:
         return json.dumps({**self.body(), "signature": self.signature, "pubkey": self.pubkey}, indent=indent)
@@ -80,7 +81,8 @@ class Certificate:
     @staticmethod
     def from_json(s: str) -> "Certificate":
         d = json.loads(s)
-        return Certificate(d["verdict"], d["policy"], d.get("rules", []), d.get("signature", ""), d.get("pubkey", ""))
+        return Certificate(d["verdict"], d["policy"], d.get("commitments", {}), d.get("rules", []),
+                           d.get("signature", ""), d.get("pubkey", ""))
 
     def verify(self, policy: dict, pin_pubkey: str) -> tuple[bool, str]:
         from cryptography.exceptions import InvalidSignature
@@ -99,15 +101,17 @@ class Certificate:
             return False, f"not an ALLOW certificate (verdict '{self.verdict}')"
         try:
             for e in self.rules:
-                if not _verify_rule(e):
+                # every rule on a field verifies against that field's ONE commitment -> same-field rules
+                # (e.g. max & min on 'amount') are structurally bound to the same hidden value.
+                if not _verify_rule(e, self.commitments[e["field"]]):
                     return False, f"ZK proof for rule {e['type']} {e['field']} does not verify"
         except (ValueError, TypeError, KeyError):
             return False, "malformed commitment or proof (fails closed)"
         return True, f"signature valid AND {len(self.rules)} ZK compliance proofs verify"
 
 
-def _verify_rule(e: dict) -> bool:
-    C = _G.deser(e["commitment"])
+def _verify_rule(e: dict, commitment_hex: str) -> bool:
+    C = _G.deser(commitment_hex)
     if e["type"] == "max":
         kind = e.get("kind", "bulletproofs")
         if kind == "bitwise":
@@ -124,39 +128,57 @@ def _verify_rule(e: dict) -> bool:
 def issue(action: dict, policy: dict, signing_key, nbits: int = 32, range_proof: str = "bulletproofs") -> Certificate:
     """Build a signed, zero-knowledge compliance certificate for `action` under `policy`.
     `range_proof`: "bulletproofs" (default, ~6x smaller) or "bitwise" (~2x faster to issue), for max/min rules.
-    Raises ValueError if the action violates any rule (a false statement cannot be proven)."""
+    Each field is committed ONCE and shared across its rules, so multiple rules on a field (e.g. a min/max
+    band) are bound to the same hidden value. Raises ValueError if the action violates any rule."""
     rules = _normalize(policy)
-    entries: list[dict] = []
+    by_field: dict[str, list] = {}
     for r in rules:
-        f = r["field"]
-        r_blind = secrets.randbelow(Q)
-        if r["type"] == "max":
-            v = int(action[f])
-            limit = int(r["limit"])
-            if not (0 <= v <= limit < (1 << nbits)):
-                raise ValueError(f"rule violated: {f} not in [0, {limit}]")
-            if range_proof == "bulletproofs":
-                C, pf = _bp.prove_le(v, r_blind, limit, nbits)
-            elif range_proof == "bitwise":
-                C, pf = _bitwise.prove_le(v, r_blind, limit, nbits, group=_G)
-            else:
-                raise ValueError("range_proof must be 'bulletproofs' or 'bitwise'")
-            entries.append({**r, "commitment": _G.ser(C), "proof": pf, "kind": range_proof})
-        elif r["type"] == "min":
-            v = int(action[f])
-            floor = int(r["floor"])
-            if not (0 <= floor <= v < (1 << nbits)):
-                raise ValueError(f"rule violated: {f} < {floor}")
-            C, pf = _bp.prove_ge(v, r_blind, floor, nbits)
-            entries.append({**r, "commitment": _G.ser(C), "proof": pf})
-        elif r["type"] == "in":
-            v = str(action.get(f))
-            if v not in r["set"]:
-                raise ValueError(f"rule violated: {f}={v} not permitted")
-            proof, C = zk_core.prove(_G, tuple(_scalar(n) for n in r["set"]), _scalar(v), r_blind, "allow", f"pcai/in/{f}")
-            entries.append({**r, "commitment": _G.ser(C), "proof": proof.to_dict()})
+        by_field.setdefault(r["field"], []).append(r)
 
-    cert = Certificate(verdict="ALLOW", policy=rules, rules=entries)
+    commitments: dict[str, str] = {}
+    entries: list[dict] = []
+    for f, frules in by_field.items():
+        types = {r["type"] for r in frules}
+        if types & {"max", "min"} and "in" in types:
+            raise ValueError(f"field '{f}' mixes numeric (max/min) and membership (in) rules")
+        r_blind = secrets.randbelow(Q)  # ONE blinding per field -> one shared commitment
+
+        if "in" in types:
+            v = str(action.get(f))
+            C = None
+            for r in frules:
+                if v not in r["set"]:
+                    raise ValueError(f"rule violated: {f}={v} not permitted")
+                proof, C = zk_core.prove(_G, tuple(_scalar(n) for n in r["set"]), _scalar(v), r_blind, "allow", f"pcai/in/{f}")
+                entries.append({**r, "proof": proof.to_dict()})
+            commitments[f] = _G.ser(C)
+        else:
+            v = int(action[f])
+            # a min rule needs the Bulletproofs generator; force the whole field onto it so max & min share hb
+            use_bp = range_proof == "bulletproofs" or "min" in types
+            if range_proof not in ("bulletproofs", "bitwise"):
+                raise ValueError("range_proof must be 'bulletproofs' or 'bitwise'")
+            C = None
+            for r in frules:
+                if r["type"] == "max":
+                    limit = int(r["limit"])
+                    if not (0 <= v <= limit < (1 << nbits)):
+                        raise ValueError(f"rule violated: {f} not in [0, {limit}]")
+                    if use_bp:
+                        C, pf = _bp.prove_le(v, r_blind, limit, nbits)
+                        entries.append({**r, "proof": pf, "kind": "bulletproofs"})
+                    else:
+                        C, pf = _bitwise.prove_le(v, r_blind, limit, nbits, group=_G)
+                        entries.append({**r, "proof": pf, "kind": "bitwise"})
+                else:  # min
+                    floor = int(r["floor"])
+                    if not (0 <= floor <= v < (1 << nbits)):
+                        raise ValueError(f"rule violated: {f} < {floor}")
+                    C, pf = _bp.prove_ge(v, r_blind, floor, nbits)
+                    entries.append({**r, "proof": pf})
+            commitments[f] = _G.ser(C)
+
+    cert = Certificate(verdict="ALLOW", policy=rules, commitments=commitments, rules=entries)
     cert.signature = signing_key.sign(_canonical(cert.body())).hex()
     cert.pubkey = signing_key.public_key().public_bytes_raw().hex()
     return cert
