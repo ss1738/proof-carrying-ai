@@ -59,7 +59,7 @@ def _make_handler(key, audit: AuditLog | None = None):
                     if not isinstance(req, dict) or not isinstance(req.get("action"), dict) or not isinstance(req.get("policy"), dict):
                         return self._send(400, {"error": "expected {action: {...}, policy: {...}}"})
                     try:
-                        cert = issue(req["action"], req["policy"], key)
+                        cert = issue(req["action"], req["policy"], key, context=str(req.get("context", "")))
                     except ValueError as e:
                         return self._send(422, {"error": str(e), "certifiable": False})
                     audit.record(cert)
@@ -68,7 +68,7 @@ def _make_handler(key, audit: AuditLog | None = None):
                     if not isinstance(req, dict) or not isinstance(req.get("certificate"), dict) or not isinstance(req.get("policy"), dict):
                         return self._send(400, {"error": "expected {certificate: {...}, policy: {...}}"})
                     cert = Certificate.from_json(json.dumps(req["certificate"]))
-                    ok, reason = cert.verify(req["policy"], req.get("pubkey", pub))
+                    ok, reason = cert.verify(req["policy"], req.get("pubkey", pub), context=str(req.get("context", "")))
                     return self._send(200, {"valid": ok, "reason": reason})
                 return self._send(404, {"error": "not found"})
             except Exception as e:  # any unexpected input -> fail closed with 400, never 500

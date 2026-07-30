@@ -40,8 +40,9 @@ The bridge from "in the allowed set" to "compliant with the policy" is **machine
 - **Data-availability of commitments.** The certificate proves compliance of a *committed* value; it does not
   prove the committed value is the one the agent actually acted on. Binding the commitment to the executed
   action (e.g. inside an ERC-4337 account's validation) is an integration responsibility.
-- **Replay.** Certificates are not nonce-bound by default; an integrator that needs anti-replay must bind a
-  nonce/context into the policy `domain`.
+- **Replay.** Certificates are not nonce-bound *by default*, but `issue(..., context=...)` binds an optional
+  nonce / tx-id / window into the signed certificate; the verifier must be given the same `context`, so a
+  bound certificate cannot be replayed for a different action.
 
 ## Self-audit (pre-external-review)
 

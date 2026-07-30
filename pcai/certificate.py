@@ -69,11 +69,13 @@ class Certificate:
     policy: list  # normalized rule list
     commitments: dict = field(default_factory=dict)  # field -> ONE commitment (shared across its rules)
     rules: list = field(default_factory=list)  # per-rule proof material (references its field's commitment)
+    context: str = ""  # optional binding: a nonce / tx-id / time window -> anti-replay
     signature: str = ""
     pubkey: str = ""
 
     def body(self) -> dict:
-        return {"verdict": self.verdict, "policy": self.policy, "commitments": self.commitments, "rules": self.rules}
+        return {"verdict": self.verdict, "policy": self.policy, "commitments": self.commitments,
+                "rules": self.rules, "context": self.context}
 
     def to_json(self, indent=2) -> str:
         return json.dumps({**self.body(), "signature": self.signature, "pubkey": self.pubkey}, indent=indent)
@@ -82,14 +84,16 @@ class Certificate:
     def from_json(s: str) -> "Certificate":
         d = json.loads(s)
         return Certificate(d["verdict"], d["policy"], d.get("commitments", {}), d.get("rules", []),
-                           d.get("signature", ""), d.get("pubkey", ""))
+                           d.get("context", ""), d.get("signature", ""), d.get("pubkey", ""))
 
-    def verify(self, policy: dict, pin_pubkey: str) -> tuple[bool, str]:
+    def verify(self, policy: dict, pin_pubkey: str, context: str = "") -> tuple[bool, str]:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
         if _normalize(policy) != self.policy:
             return False, "policy does not match the certificate's policy"
+        if self.context != context:
+            return False, "context does not match (possible replay)"
         if self.pubkey != pin_pubkey:
             return False, "public key does not match the pinned key"
         try:
@@ -142,9 +146,12 @@ def _verify_rule(e: dict, commitment_hex: str) -> bool:
     return False
 
 
-def issue(action: dict, policy: dict, signing_key, nbits: int = 32, range_proof: str = "bulletproofs") -> Certificate:
+def issue(action: dict, policy: dict, signing_key, nbits: int = 32, range_proof: str = "bulletproofs",
+          context: str = "") -> Certificate:
     """Build a signed, zero-knowledge compliance certificate for `action` under `policy`.
     `range_proof`: "bulletproofs" (default, ~6x smaller) or "bitwise" (~2x faster to issue), for max/min rules.
+    `context`: an optional string (nonce, tx-id, time window) bound into the signed certificate; the verifier
+    must be given the same context, so a certificate cannot be replayed for a different action.
     Each field is committed ONCE and shared across its rules, so multiple rules on a field (e.g. a min/max
     band) are bound to the same hidden value. Raises ValueError if the action violates any rule."""
     rules = _normalize(policy)
@@ -195,7 +202,7 @@ def issue(action: dict, policy: dict, signing_key, nbits: int = 32, range_proof:
                     entries.append({**r, "proof": pf})
             commitments[f] = _G.ser(C)
 
-    cert = Certificate(verdict="ALLOW", policy=rules, commitments=commitments, rules=entries)
+    cert = Certificate(verdict="ALLOW", policy=rules, commitments=commitments, rules=entries, context=str(context))
     cert.signature = signing_key.sign(_canonical(cert.body())).hex()
     cert.pubkey = signing_key.public_key().public_bytes_raw().hex()
     return cert

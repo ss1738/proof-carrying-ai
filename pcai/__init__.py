@@ -6,4 +6,4 @@ verifiable from public data alone and unforgeable. See certificate.issue / Certi
 from .certificate import Certificate, issue, policy_id
 
 __all__ = ["Certificate", "issue", "policy_id"]
-__version__ = "0.3.3"
+__version__ = "0.4.0"
