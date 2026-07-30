@@ -21,6 +21,7 @@ py demo_structured_certificate.py
 py live_agent_bridge.py
 py tests/test_pcai.py
 py tests/test_server.py
+py examples/agent_payment.py
 if command -v forge >/dev/null 2>&1 && [ -d onchain/lib/forge-std ]; then
   echo "On-chain verifier (forge):"
   printf "  Sol  %-22s " "SigmaVerifier.sol"
