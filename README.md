@@ -66,6 +66,24 @@ Add `--regions EU,UK --region UK` to also prove **residency** in zero knowledge 
 external path, no cloned dependency. (The repository's *reference demos* still use [qedra](https://github.com/ss1738/agent-guardrail);
 the installable product does not.)
 
+**Drop into an agent.** `pcai.gate` wraps the tool that moves money or touches data, so every executed call
+carries a certificate and any non-compliant call is blocked before it runs:
+
+```python
+from pcai.gate import gate, PolicyViolation
+
+@gate({"spend_cap": 1000, "allowlist": ["alice", "bob"]}, signing_key)
+def send_payment(action):        # the agent's tool
+    return bank.transfer(action["amount"], action["counterparty"])
+
+out = send_payment({"amount": 750, "counterparty": "alice"})
+out.result        # the transfer result
+out.certificate   # a ZK proof the call obeyed the policy — verify with the public key alone
+```
+
+`examples/agent_payment.py` runs a full agent session: compliant payments execute *with* verified
+certificates, over-cap / non-allowlisted / wrong-region payments are blocked before execution.
+
 **As a service.** `pcai serve` runs an HTTP API so an agent runtime integrates without linking the library:
 
 ```bash
