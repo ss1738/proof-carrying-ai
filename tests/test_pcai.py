@@ -125,6 +125,12 @@ def main() -> int:
     okpf_big = dict(okpf); okpf_big["n"] = 256                    # claim a vacuous range
     checks.append(("large-nbits range proof rejected (guard)", not _bpm.verify_le(Cok, 1000, okpf_big), ""))
 
+    # 16. context binding (anti-replay): a cert bound to a context verifies only with that context
+    cc = issue({"amount": 500, "counterparty": "alice"}, POLICY, key, context="tx-abc-123")
+    checks.append(("bound context verifies", cc.verify(POLICY, pub, context="tx-abc-123")[0], ""))
+    checks.append(("wrong context rejected (replay)", not cc.verify(POLICY, pub, context="tx-xyz-999")[0], ""))
+    checks.append(("missing context rejected", not cc.verify(POLICY, pub)[0], ""))
+
     allok = True
     for name, passed, note in checks:
         allok = allok and passed

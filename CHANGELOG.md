@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- **Context binding (anti-replay)** — `issue(..., context="tx-123")` binds a nonce / tx-id / window into the
+  signed certificate; `verify(..., context=...)` must match. Exposed on the CLI (`--context`) and service
+  (`context` field). Closes the replay limitation noted in SECURITY.md.
+
 ## 0.3.3
 
 **Soundness fix (vacuous range).** The verifier now caps a range proof's `nbits` at 64. A range proof asserts a

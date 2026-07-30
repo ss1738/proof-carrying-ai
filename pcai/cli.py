@@ -60,6 +60,7 @@ def main(argv=None) -> int:
     c.add_argument("--allow", help="payment shorthand: comma-separated allowlist")
     c.add_argument("--region", help="the action's region (only if --regions is given)")
     c.add_argument("--regions", help="comma-separated allowed regions (residency rule)")
+    c.add_argument("--context", default="", help="bind a nonce / tx-id / window (anti-replay)")
     c.add_argument("--out", help="write certificate JSON here (default: stdout)")
 
     v = sub.add_parser("verify", help="verify a certificate")
@@ -68,6 +69,7 @@ def main(argv=None) -> int:
     v.add_argument("--cap", type=int, help="payment shorthand: spend cap")
     v.add_argument("--allow", help="payment shorthand: allowlist")
     v.add_argument("--regions", help="comma-separated allowed regions (must match certify)")
+    v.add_argument("--context", default="", help="the context bound at certify time (must match)")
     v.add_argument("--pubkey", required=True)
 
     args = ap.parse_args(argv)
@@ -114,7 +116,7 @@ def main(argv=None) -> int:
                 policy["residency"] = args.regions.split(",")
                 action["region"] = args.region
         try:
-            cert = issue(action, policy, key)
+            cert = issue(action, policy, key, context=args.context)
         except ValueError as e:
             print(f"REFUSED: {e} (a non-compliant action cannot be certified)", file=sys.stderr)
             return 1
@@ -134,7 +136,7 @@ def main(argv=None) -> int:
             policy = {"spend_cap": args.cap, "allowlist": (args.allow or "").split(",")}
             if args.regions:
                 policy["residency"] = args.regions.split(",")
-        ok, reason = cert.verify(policy, args.pubkey)
+        ok, reason = cert.verify(policy, args.pubkey, context=args.context)
         print(f"{'VALID' if ok else 'INVALID'}: {reason}")
         return 0 if ok else 1
 
