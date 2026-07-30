@@ -15,6 +15,7 @@ py ec_group.py
 py demo_certificate.py
 py demo_policy.py
 py zk_range.py
+py bulletproof.py
 py demo_structured_certificate.py
 py live_agent_bridge.py
 echo
