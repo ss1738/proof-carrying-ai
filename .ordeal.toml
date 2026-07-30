@@ -17,3 +17,6 @@ run  = "specforge run specforge/or_proof_soundness.py 12"
 [[criterion]]
 name = "soundness-bulletproof"
 run  = "specforge run specforge/bulletproof_soundness.py 8"
+[[criterion]]
+name = "ec-group-laws"
+run  = "specforge run specforge/ec_group_laws.py 40"
