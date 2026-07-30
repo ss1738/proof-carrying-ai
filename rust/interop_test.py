@@ -61,8 +61,25 @@ res = subprocess.run([BIN, "verify", "1,2,3", TAG], input=bad, capture_output=Tr
 tamper = res.stdout.strip()
 print(f"python-> rust  tampered: {tamper} (want FAIL)")
 
-speedup_p = py_prove / (py_prove)  # placeholder; real ratio printed by caller comparing lines
-ok = r2p and p2r == "OK" and tamper == "FAIL"
-print(f"\n{'PASS' if ok else 'FAIL'}: Rust and Python prove/verify are wire-compatible (same protocol), "
-      "tampering rejected cross-language.")
+# ---- 5. Rust RANGE proof (spend_cap) -> Python zk_range.verify_le ----
+import zk_range
+LIMIT, NBITS = 1000, 16
+out = subprocess.run([BIN, "range-prove", str(LIMIT), "750", str(NBITS)], capture_output=True, text=True).stdout.strip()
+rd = json.loads(out)
+r_range = zk_range.verify_le(int(rd["C_amount"]), LIMIT, rd["range"], group=MODP)
+print(f"\nrust range-proof -> python verify_le : {'OK' if r_range else 'FAIL'}  (amount<=limit, zero-knowledge)")
+
+# ---- 6. full payment certificate: head-to-head (range + membership), same box ----
+CREPS = 30
+t0 = time.perf_counter()
+for _ in range(CREPS):
+    Ca, rp = zk_range.prove_le(750, secrets.randbelow(MODP.q), LIMIT, NBITS, group=MODP)
+    mp, Ccp = zk_core.prove(MODP, MS, M, secrets.randbelow(MODP.q), "allow", "cert/cp")
+py_cert = (time.perf_counter() - t0) / CREPS * 1000
+print(f"\npython full payment cert (range n={NBITS}+membership): prove {py_cert:.1f} ms (reps={CREPS})")
+print(subprocess.run([BIN, "cert-bench", str(CREPS), str(NBITS)], capture_output=True, text=True).stdout.strip())
+
+ok = r2p and p2r == "OK" and tamper == "FAIL" and r_range
+print(f"\n{'PASS' if ok else 'FAIL'}: Rust and Python prove/verify are wire-compatible (same protocol) for "
+      "BOTH the OR-proof and the full range certificate; tampering rejected cross-language.")
 raise SystemExit(0 if ok else 1)
