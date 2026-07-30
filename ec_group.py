@@ -25,33 +25,80 @@ def _inv_mod_p(x: int) -> int:
     return pow(x % _P, _P - 2, _P)
 
 
+# --- Jacobian coordinates (X,Y,Z), affine (x,y)=(X/Z^2, Y/Z^3), Z=0 = identity; a=0 curve. One field
+#     inversion per scalar-mul (at _to_affine) instead of one per point-add -- the measured bottleneck. ---
+def _jac_double(P):
+    X, Y, Z = P
+    if Z == 0:
+        return (1, 1, 0)
+    A = (X * X) % _P
+    B = (Y * Y) % _P
+    C = (B * B) % _P
+    D = (2 * ((X + B) * (X + B) - A - C)) % _P
+    E = (3 * A) % _P
+    F = (E * E) % _P
+    X3 = (F - 2 * D) % _P
+    Y3 = (E * (D - X3) - 8 * C) % _P
+    Z3 = (2 * Y * Z) % _P
+    return (X3, Y3, Z3)
+
+
+def _jac_add(P, Q):
+    if P[2] == 0:
+        return Q
+    if Q[2] == 0:
+        return P
+    X1, Y1, Z1 = P
+    X2, Y2, Z2 = Q
+    Z1Z1 = (Z1 * Z1) % _P
+    Z2Z2 = (Z2 * Z2) % _P
+    U1 = (X1 * Z2Z2) % _P
+    U2 = (X2 * Z1Z1) % _P
+    S1 = (Y1 * Z2 * Z2Z2) % _P
+    S2 = (Y2 * Z1 * Z1Z1) % _P
+    if U1 == U2:
+        return _jac_double(P) if S1 == S2 else (1, 1, 0)
+    H = (U2 - U1) % _P
+    HH = (H * H) % _P
+    HHH = (H * HH) % _P
+    Rr = (S2 - S1) % _P
+    V = (U1 * HH) % _P
+    X3 = (Rr * Rr - HHH - 2 * V) % _P
+    Y3 = (Rr * (V - X3) - S1 * HHH) % _P
+    Z3 = (H * Z1 * Z2) % _P
+    return (X3, Y3, Z3)
+
+
+def _to_affine(P):
+    if P[2] == 0:
+        return None
+    zi = _inv_mod_p(P[2])
+    zi2 = (zi * zi) % _P
+    return ((P[0] * zi2) % _P, (P[1] * zi2 * zi) % _P)
+
+
 def _add(p, q):
     if p is None:
         return q
     if q is None:
         return p
-    x1, y1 = p
-    x2, y2 = q
-    if x1 == x2 and (y1 + y2) % _P == 0:
-        return None                       # P + (-P) = infinity
-    if p == q:
-        s = (3 * x1 * x1 + _A) * _inv_mod_p(2 * y1) % _P
-    else:
-        s = (y2 - y1) * _inv_mod_p(x2 - x1) % _P
-    x3 = (s * s - x1 - x2) % _P
-    y3 = (s * (x1 - x3) - y1) % _P
-    return (x3, y3)
+    return _to_affine(_jac_add((p[0], p[1], 1), (q[0], q[1], 1)))
 
 
 def _mul(k: int, p):
+    if p is None:
+        return None
     k %= _N
-    r = None
+    if k == 0:
+        return None
+    acc = (1, 1, 0)
+    cur = (p[0], p[1], 1)
     while k:
         if k & 1:
-            r = _add(r, p)
-        p = _add(p, p)
+            acc = _jac_add(acc, cur)
+        cur = _jac_double(cur)
         k >>= 1
-    return r
+    return _to_affine(acc)
 
 
 def _on_curve(p) -> bool:
