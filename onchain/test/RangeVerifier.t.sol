@@ -81,4 +81,25 @@ contract RangeVerifierTest is Test {
         big.domains = doms;
         assertFalse(v.verifyRange(big), "range proof over 64 bits must be rejected (vacuous)");
     }
+
+    /// Fuzz: replacing any bit commitment's x-coord with a different value must fail or revert.
+    function testFuzz_mutated_bit_commitment_never_verifies(uint256 idx, uint256 cx) public {
+        idx = idx % rp.bits.length;
+        vm.assume(cx != rp.bits[idx].Cx);
+        RangeVerifier.RangeProof memory bad = rp;
+        bad.bits[idx].Cx = cx;
+        try v.verifyRange(bad) returns (bool ok) {
+            assertFalse(ok, "mutated bit commitment must not verify");
+        } catch {}
+    }
+
+    /// Fuzz: replacing the amount commitment x-coord must break the homomorphic bind (fail or revert).
+    function testFuzz_mutated_amount_commitment_never_verifies(uint256 cax) public {
+        vm.assume(cax != rp.CAx);
+        RangeVerifier.RangeProof memory bad = rp;
+        bad.CAx = cax;
+        try v.verifyRange(bad) returns (bool ok) {
+            assertFalse(ok, "mutated amount commitment must not verify");
+        } catch {}
+    }
 }
