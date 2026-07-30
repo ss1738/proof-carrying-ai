@@ -55,6 +55,9 @@ regression-tested). They are recorded here in the spirit of honest disclosure �
   cert could drop a rule. Fixed: proven rules must equal the policy.
 - **Vacuous range** (0.3.3) — a range proof with `nbits` near the group order makes the interval the whole
   field, so an over-cap amount passed. Fixed: `nbits` is capped at 64.
+- **On-chain vacuous range** — `RangeVerifier` had the same gap (unbounded bit count). Fixed: `n ≤ 64`.
+- **Registry policy binding** — `ComplianceRegistry.attest` took the policy id as a free parameter, unbound to
+  the proven cap/allowed set. Fixed: the id is derived on-chain from the verified parameters.
 
 ## Reporting a vulnerability
 
