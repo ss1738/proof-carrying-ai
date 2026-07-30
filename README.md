@@ -19,6 +19,7 @@ Runnable demos (python):
   Run  demo_certificate.py    PASS
   Run  demo_policy.py         PASS
   Run  zk_range.py            PASS
+  Run  bulletproof.py         PASS
   Run  demo_structured_certificate.py PASS
   Run  live_agent_bridge.py   PASS
 ALL CHECKS PASSED
@@ -74,6 +75,25 @@ homomorphism bind them — the verifier recomputes `∏ Cᵢ^(2^i)` and checks i
 The one arithmetic fact this rests on — *n genuine bits reconstruct a value strictly below 2ⁿ* — is
 machine-checked and **axiom-free** in `coq/RangeProof.v` (`range_bound`, `spend_cap_sound`). If that were
 false, a valid-looking bit proof would bound nothing.
+
+## Logarithmic range proofs: Bulletproofs (`bulletproof.py`)
+
+The bit-decomposition range proof is O(n) in size (one commitment + OR-proof per bit). `bulletproof.py`
+implements a **Bulletproofs** range proof (Bunz et al. 2018) over secp256k1: a committed value in `[0, 2^n)`
+with an **O(log n)** proof, built on an inner-product argument (also here, independently tested). The IPA folds
+the length-n `l`,`r` vectors down to `2·log2(n)` points via recursive halving.
+
+**Measured** (`bulletproof.py`; proof size vs the bit-decomposition on the same secp256k1 group):
+
+| n bits | Bulletproofs | bit-decomposition | smaller |
+|---|---|---|---|
+| 16 | 1,324 B | 9,237 B | 7.0× |
+| 32 | **1,465 B** | 18,446 B | **12.6×** |
+
+The Bulletproofs proof grows **logarithmically** — 16→32 bits adds ~141 B (one IPA round) while the
+bit-decomposition *doubles*. That is an asymptotic change, not a constant-factor one. Sound (honest verifies;
+a proof replayed against a commitment to a different value is rejected; an out-of-range value cannot be
+proven). Prototype crypto (Fiat-Shamir in ROM), pending external review like the rest.
 
 ## The landmark seed: a certificate for a real agent action (`demo_structured_certificate.py`)
 
