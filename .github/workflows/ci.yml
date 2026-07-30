@@ -33,3 +33,20 @@ jobs:
 
       - name: Run the full verification suite
         run: ./verify.sh
+
+      # Externally reproduce the differential soundness check (previously only run
+      # on the author's Mini cluster). Two independent verifiers (Python + zkcore)
+      # must agree on every proof; all three provers exercised; tampering rejected.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: GMP (for the zkcore-gmp backend)
+        run: sudo apt-get install -y libgmp-dev m4
+      - name: Build native ZK backends
+        run: |
+          cargo build --release --manifest-path rust/zkcore/Cargo.toml
+          cargo build --release --manifest-path rust/zkcore-gmp/Cargo.toml
+      - name: Differential fuzz (soundness across backends)
+        run: |
+          export QEDRA_PATH="$HOME/agent-guardrail"
+          export PCAI_RUST="$GITHUB_WORKSPACE/rust"
+          python3 fuzz/differential_fuzz.py 80
