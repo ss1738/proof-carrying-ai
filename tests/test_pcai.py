@@ -108,6 +108,14 @@ def main() -> int:
     except ValueError:
         checks.append(("below band floor refused", True, ""))
 
+    # 14. completeness: a cert that drops a rule (even re-signed) must be rejected
+    from pcai.certificate import _canonical
+    inc = issue({"amount": 500}, band, key)
+    inc.rules = [e for e in inc.rules if e["type"] != "min"]  # drop the min proof
+    inc.signature = key.sign(_canonical(inc.body())).hex()   # operator re-signs the incomplete cert
+    oki, _ = inc.verify(band, pub)
+    checks.append(("incomplete cert (dropped rule) rejected", not oki, ""))
+
     allok = True
     for name, passed, note in checks:
         allok = allok and passed

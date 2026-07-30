@@ -99,6 +99,11 @@ class Certificate:
             return False, "signature invalid (certificate tampered)"
         if self.verdict != "ALLOW":
             return False, f"not an ALLOW certificate (verdict '{self.verdict}')"
+        # completeness: the certificate must carry a proof for EVERY rule in its policy (no dropped rules).
+        proven = sorted(({k: v for k, v in e.items() if k not in ("proof", "kind")} for e in self.rules),
+                        key=lambda x: (x["field"], x["type"]))
+        if proven != self.policy:
+            return False, "certificate does not prove every policy rule"
         try:
             for e in self.rules:
                 # every rule on a field verifies against that field's ONE commitment -> same-field rules

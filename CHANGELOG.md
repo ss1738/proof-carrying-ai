@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+**Soundness fix (completeness).** `verify` now requires the certificate to carry a proof for **every** rule in
+its policy. Previously a certificate could drop a rule (and be re-signed by the key holder) yet still verify,
+letting a malicious operator claim a policy while proving only a subset. The verifier now checks the proven
+rules exactly match the policy. Regression test added.
+
 ## 0.3.1
 
 **Soundness fix.** A field is now committed **once** and shared across all its rules. Previously a policy with
