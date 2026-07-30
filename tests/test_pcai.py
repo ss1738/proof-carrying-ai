@@ -57,6 +57,19 @@ def main() -> int:
     okp, _ = cert.verify({"spend_cap": 1000, "allowlist": ["alice", "carol"]}, pub)
     checks.append(("mismatched policy rejected", not okp, ""))
 
+    # 8. residency: a policy with regions -> region proven in ZK too
+    rpol = {"spend_cap": 1000, "allowlist": ["alice", "bob"], "residency": ["EU", "UK"]}
+    rcert = issue({"amount": 750, "counterparty": "bob", "region": "UK"}, rpol, key)
+    okr, whyr = rcert.verify(rpol, pub)
+    checks.append(("residency issues + verifies (3 ZK proofs)", okr and "3 ZK" in whyr, whyr))
+
+    # 9. wrong region cannot be certified
+    try:
+        issue({"amount": 750, "counterparty": "bob", "region": "CN"}, rpol, key)
+        checks.append(("wrong region refused", False, "issued a false certificate"))
+    except ValueError:
+        checks.append(("wrong region refused", True, ""))
+
     allok = True
     for name, passed, note in checks:
         allok = allok and passed
