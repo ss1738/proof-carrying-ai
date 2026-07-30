@@ -6,4 +6,7 @@ libs = ["lib"]
 optimizer = true
 optimizer_runs = 200
 via_ir = true
-fs_permissions = [{ access = "read", path = "./proof.json" }]
+fs_permissions = [
+  { access = "read", path = "./proof.json" },
+  { access = "read", path = "./range_proof.json" },
+]
