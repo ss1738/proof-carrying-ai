@@ -91,6 +91,36 @@ def verify(ms, C, t, e, z, dom) -> bool:
     return True
 
 
+# ---- range proof (spend_cap) over BN254 by bit-decomposition, reusing the OR-proof per bit ----
+def range_prove(amount: int, r_a: int, limit: int, nbits: int):
+    C_amount = pedersen(amount, r_a)
+    d = limit - amount
+    r = [secrets.randbelow(R) for _ in range(nbits)]
+    target = (-r_a) % R
+    partial = sum(r[i] * (1 << i) for i in range(nbits - 1)) % R
+    inv_top = pow((1 << (nbits - 1)) % R, -1, R)
+    r[nbits - 1] = ((target - partial) * inv_top) % R
+    bits = []
+    for i in range(nbits):
+        bit = (d >> i) & 1
+        C, t, e, z, dom = prove([0, 1], bit, r[i], f"range/bit/{i}", "bit")
+        bits.append({"C": C, "t": t, "e": e, "z": z, "dom": dom})
+    return C_amount, bits
+
+
+def range_verify(C_amount, limit: int, nbits: int, bits) -> bool:
+    if len(bits) != nbits:
+        return False
+    for b in bits:
+        if not verify([0, 1], b["C"], b["t"], b["e"], b["z"], b["dom"]):
+            return False
+    acc = None
+    for i, b in enumerate(bits):
+        acc = bn.add(acc, bn.mul((1 << i) % R, b["C"]))          # sum 2^i * C_bit_i
+    C_d = bn.add(bn.mul(limit % R, G), bn.mul(R - 1, C_amount))  # limit*G - C_amount
+    return acc == C_d
+
+
 if __name__ == "__main__":
     MS, M, TAG, VERDICT = [1, 2, 3], 2, "cert/counterparty", "allow"
     C, t, e, z, dom = prove(MS, M, secrets.randbelow(R), TAG, VERDICT)
@@ -111,7 +141,28 @@ if __name__ == "__main__":
         "z": [hx(v) for v in z],
         "Hx": hx(H[0]), "Hy": hx(H[1]),
     }
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "proof.json"), "w") as f:
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "proof.json"), "w") as f:
         json.dump(out, f, indent=2)
     print("wrote onchain/proof.json for the forge test")
-    raise SystemExit(0 if ok and not bad else 1)
+
+    # range proof (spend_cap): amount <= limit, over BN254, verified on-chain per bit + homomorphic bind
+    NBITS, AMOUNT, LIMIT = 16, 750, 1000
+    C_amount, bits = range_prove(AMOUNT, secrets.randbelow(R), LIMIT, NBITS)
+    rok = range_verify(C_amount, LIMIT, NBITS, bits)
+    rbad = range_verify(bn.add(bn.mul(9999, G), bn.mul(secrets.randbelow(R), H)), LIMIT, NBITS, bits)
+    print(f"onchain range   : honest={'OK' if rok else 'FAIL'} forged={'REJECTED' if not rbad else 'ACCEPTED!!'}")
+    rout = {
+        "limit": hx(LIMIT), "nbits": NBITS,
+        "CAx": hx(C_amount[0]), "CAy": hx(C_amount[1]),
+        "domains": ["0x" + b["dom"].hex() for b in bits],
+        "bitCx": [hx(b["C"][0]) for b in bits], "bitCy": [hx(b["C"][1]) for b in bits],
+        "t0x": [hx(b["t"][0][0]) for b in bits], "t0y": [hx(b["t"][0][1]) for b in bits],
+        "t1x": [hx(b["t"][1][0]) for b in bits], "t1y": [hx(b["t"][1][1]) for b in bits],
+        "e0": [hx(b["e"][0]) for b in bits], "e1": [hx(b["e"][1]) for b in bits],
+        "z0": [hx(b["z"][0]) for b in bits], "z1": [hx(b["z"][1]) for b in bits],
+    }
+    with open(os.path.join(here, "range_proof.json"), "w") as f:
+        json.dump(rout, f, indent=2)
+    print("wrote onchain/range_proof.json for the forge test")
+    raise SystemExit(0 if ok and not bad and rok and not rbad else 1)

@@ -207,10 +207,19 @@ byte-Fiat-Shamir) and verified on-chain unchanged. Measured with Foundry (`forge
 verify gas (|ms|=3): 132,844
 ```
 
-A real off-chain proof verifies on-chain for **~133k gas** (3-element allowed set), and every tamper — the
-commitment, a challenge scalar, or the claimed allowed set — is rejected. This is the on-chain half of a
-proof-carrying certificate, and the concrete "verifiable agent action for Ethereum smart accounts" deliverable.
-Run it: `cd onchain && forge install foundry-rs/forge-std && python3 onchain_prove.py && forge test -vv`.
+Both rules of the payment policy verify on-chain (`RangeVerifier.sol` reuses the same clause check per bit +
+a homomorphic bind):
+
+| on-chain check | contract | gas |
+|---|---|---|
+| allowlist / verdict (set membership) | `SigmaVerifier.verify` | ~132,844 (|ms|=3) |
+| spend_cap (range, n=16) | `RangeVerifier.verifyRange` | ~1,228,456 |
+
+Every tamper — the commitment, a challenge scalar, the allowed set, the amount, or the limit — is rejected
+(an off-curve point fails closed via the precompile). The range verifier is O(n) gas (bit-decomposition); a
+Bulletproofs on-chain verifier would cut it to O(log n) and is the natural next optimization. This is the
+concrete "verifiable agent action for Ethereum smart accounts" deliverable. Run it:
+`cd onchain && forge install foundry-rs/forge-std && python3 onchain_prove.py && forge test -vv`.
 
 ## Why it's defensible
 
