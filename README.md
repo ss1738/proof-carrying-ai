@@ -11,6 +11,21 @@ The bet (see the thesis behind it): as AI agents take real actions autonomously,
 verification becomes the scarce asset.* Existing tools **detect** heuristically; this one **proves.** The
 distinction — "here is a proof it complied" vs "we didn't find a problem" — is the whole point.
 
+## What's here
+
+| Surface | Use it for |
+|---|---|
+| **`pcai` library** — `issue` / `Certificate.verify` | issue and check ZK compliance certificates in-process |
+| **`pcai` CLI** — `keygen · certify · verify · serve · bench` | scripts and ops without writing code |
+| **`pcai.gate`** decorator | drop into an agent — every tool call is gated + certified, non-compliant calls blocked |
+| **`pcai serve`** HTTP API | integrate over HTTP (`/certify`, `/verify`, `/health`, `/audit`) |
+| **`pcai.audit`** | a tamper-evident, hash-chained trail of every certificate issued |
+| **`onchain/`** (Solidity, BN254) | verify a certificate *on-chain* (`SigmaVerifier`, `RangeVerifier`, `ComplianceRegistry`) |
+| **`coq/`** (axiom-free) | the machine-checked soundness the whole thing rests on |
+
+Installable (`pip install .`, self-contained), CI-green, publish-ready. See **Production readiness** below for
+the honest scope (the crypto is audit-pending).
+
 ```
 $ ./verify.sh
 Machine-checked proofs (coqc):
