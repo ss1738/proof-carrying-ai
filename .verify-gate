@@ -1,0 +1,2 @@
+# push gate: verify-gate runs this, captures the exit code, refuses stale/failing pushes
+verify: ./verify.sh

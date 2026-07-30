@@ -14,3 +14,6 @@ onchain/out/
 onchain/cache/
 .*.aux
 *.aux
+status.json
+.verify-gate.d/
+fuzz/logs/
