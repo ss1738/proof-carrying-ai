@@ -98,16 +98,17 @@ proven). Prototype crypto (Fiat-Shamir in ROM), pending external review like the
 **Native prover, wire-compatible** (`rust/bulletproof-rs`): a Rust Bulletproofs prover over the *same*
 secp256k1 group — identical generators (verified: `g[0]`/`u` serialize byte-for-byte the same), serialization,
 and SHA256 Fiat-Shamir — so a **Rust-generated Bulletproofs proof verifies in Python's `range_verify`**
-(measured, n=16 and n=32). Speed (measured on ironman):
+(measured, n=16 and n=32, and still true after the optimization below). Speed (measured on ironman):
 
-| n | Python prove | Rust prove | speedup |
-|---|---|---|---|
-| 16 | 6,460 ms | 1,351 ms | ~4.8× |
-| 32 | 12,858 ms | 2,924 ms | ~4.4× |
+| n | Python | Rust (affine) | **Rust (Jacobian)** | total vs Python |
+|---|---|---|---|---|
+| 16 | 6,460 ms | 1,351 ms | **188 ms** | **~34×** |
+| 32 | 12,858 ms | 2,924 ms | **389 ms** | **~33×** |
 
-Honest: ~4.8× is a like-for-like **affine** EC port (num-bigint vs CPython `pow`) — both do a field inversion
-per point-add, so that dominates. Projective coordinates would help both far more; that is the real next
-optimization, not the language.
+The measurement said the bottleneck was a field inversion per point-add, not the language — so the prover uses
+**Jacobian coordinates** (one inversion per scalar-mul instead of ~256). That alone gave ~7× on top of the
+~4.8× from Rust, for ~34× over Python end-to-end, with the affine serialization preserved so proofs still
+verify in Python. This is the lever the earlier benchmark pointed to, applied and measured.
 
 ## The landmark seed: a certificate for a real agent action (`demo_structured_certificate.py`)
 
