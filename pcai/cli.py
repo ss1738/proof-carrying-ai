@@ -8,10 +8,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
 from .certificate import Certificate, issue
+
+
+def _json_arg(s: str):
+    """Parse a JSON value from a string, or from a file if it starts with '@'."""
+    if s.startswith("@"):
+        with open(os.path.expanduser(s[1:])) as f:
+            return json.load(f)
+    return json.loads(s)
 
 
 def _load_or_create_key(path: str):
@@ -43,18 +52,21 @@ def main(argv=None) -> int:
     b.add_argument("-n", type=int, default=10, help="repetitions")
 
     c = sub.add_parser("certify", help="issue a certificate for an agent action")
-    c.add_argument("--amount", type=int, required=True)
-    c.add_argument("--counterparty", required=True)
-    c.add_argument("--cap", type=int, required=True)
-    c.add_argument("--allow", required=True, help="comma-separated allowlist")
+    c.add_argument("--action", help="action as JSON (or @file) -- for general policies")
+    c.add_argument("--policy", help="policy as JSON (or @file) -- e.g. '{\"rules\":[{\"type\":\"max\",...}]}'")
+    c.add_argument("--amount", type=int, help="payment shorthand: amount")
+    c.add_argument("--counterparty", help="payment shorthand: counterparty")
+    c.add_argument("--cap", type=int, help="payment shorthand: spend cap")
+    c.add_argument("--allow", help="payment shorthand: comma-separated allowlist")
     c.add_argument("--region", help="the action's region (only if --regions is given)")
     c.add_argument("--regions", help="comma-separated allowed regions (residency rule)")
     c.add_argument("--out", help="write certificate JSON here (default: stdout)")
 
     v = sub.add_parser("verify", help="verify a certificate")
     v.add_argument("cert")
-    v.add_argument("--cap", type=int, required=True)
-    v.add_argument("--allow", required=True)
+    v.add_argument("--policy", help="policy as JSON (or @file); must match the one used to certify")
+    v.add_argument("--cap", type=int, help="payment shorthand: spend cap")
+    v.add_argument("--allow", help="payment shorthand: allowlist")
     v.add_argument("--regions", help="comma-separated allowed regions (must match certify)")
     v.add_argument("--pubkey", required=True)
 
@@ -72,7 +84,6 @@ def main(argv=None) -> int:
 
     if args.cmd == "bench":
         import time
-        from . import issue
         key = _load_or_create_key(args.key)
         pub = key.public_key().public_bytes_raw().hex()
         policy = {"spend_cap": 1000, "allowlist": ["alice", "bob"]}
@@ -93,11 +104,15 @@ def main(argv=None) -> int:
 
     if args.cmd == "certify":
         key = _load_or_create_key(args.key)
-        policy = {"spend_cap": args.cap, "allowlist": args.allow.split(",")}
-        action = {"amount": args.amount, "counterparty": args.counterparty}
-        if args.regions:
-            policy["residency"] = args.regions.split(",")
-            action["region"] = args.region
+        if args.policy:
+            policy = _json_arg(args.policy)
+            action = _json_arg(args.action) if args.action else {}
+        else:
+            policy = {"spend_cap": args.cap, "allowlist": (args.allow or "").split(",")}
+            action = {"amount": args.amount, "counterparty": args.counterparty}
+            if args.regions:
+                policy["residency"] = args.regions.split(",")
+                action["region"] = args.region
         try:
             cert = issue(action, policy, key)
         except ValueError as e:
@@ -113,9 +128,12 @@ def main(argv=None) -> int:
 
     if args.cmd == "verify":
         cert = Certificate.from_json(open(args.cert).read())
-        policy = {"spend_cap": args.cap, "allowlist": args.allow.split(",")}
-        if args.regions:
-            policy["residency"] = args.regions.split(",")
+        if args.policy:
+            policy = _json_arg(args.policy)
+        else:
+            policy = {"spend_cap": args.cap, "allowlist": (args.allow or "").split(",")}
+            if args.regions:
+                policy["residency"] = args.regions.split(",")
         ok, reason = cert.verify(policy, args.pubkey)
         print(f"{'VALID' if ok else 'INVALID'}: {reason}")
         return 0 if ok else 1
