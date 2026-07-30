@@ -189,6 +189,29 @@ Ed25519 signature (qedra's session key). Anyone re-checks both from public data 
 No trust in the agent, the operator, or this process: a blocked action yields **no** compliance proof (you
 cannot certify compliance of a non-compliant action), and flipping a receipt's verdict breaks the signature.
 
+## On-chain verification (`onchain/` — Solidity + BN254)
+
+The certificate is only useful on Ethereum if a contract can check it. `onchain/SigmaVerifier.sol` verifies a
+Sigma OR-proof (the allowlist / policy-verdict membership proof) **on-chain**, over **BN254 (alt_bn128)** using
+the `ecAdd` (0x06), `ecMul` (0x07), and `sha256` (0x02) precompiles — no trusted setup, no 2048-bit modexp. A
+smart account or bundler can gate an action on `verify(...) == true` without learning the hidden value.
+
+The proof is produced off-chain by `onchain/onchain_prove.py` (same Sigma protocol, BN254 group, SHA256
+byte-Fiat-Shamir) and verified on-chain unchanged. Measured with Foundry (`forge test`):
+
+```
+[PASS] test_honest_proof_verifies_onchain
+[PASS] test_tampered_commitment_rejected
+[PASS] test_tampered_challenge_rejected
+[PASS] test_wrong_allowed_set_rejected
+verify gas (|ms|=3): 132,844
+```
+
+A real off-chain proof verifies on-chain for **~133k gas** (3-element allowed set), and every tamper — the
+commitment, a challenge scalar, or the claimed allowed set — is rejected. This is the on-chain half of a
+proof-carrying certificate, and the concrete "verifiable agent action for Ethereum smart accounts" deliverable.
+Run it: `cd onchain && forge install foundry-rs/forge-std && python3 onchain_prove.py && forge test -vv`.
+
 ## Why it's defensible
 
 The moat is the intersection almost nobody holds: **formal verification (Coq) + zero-knowledge cryptography

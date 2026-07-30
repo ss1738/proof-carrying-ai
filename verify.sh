@@ -18,6 +18,11 @@ py zk_range.py
 py bulletproof.py
 py demo_structured_certificate.py
 py live_agent_bridge.py
+if command -v forge >/dev/null 2>&1 && [ -d onchain/lib/forge-std ]; then
+  echo "On-chain verifier (forge):"
+  printf "  Sol  %-22s " "SigmaVerifier.sol"
+  if ( cd onchain && python3 onchain_prove.py >/dev/null 2>&1 && forge test >/dev/null 2>&1 ); then echo PASS; else echo FAIL; fail=1; fi
+fi
 echo
 if [ "$fail" -eq 0 ]; then echo "ALL CHECKS PASSED"; else echo "SOME CHECKS FAILED"; fi
 exit "$fail"
