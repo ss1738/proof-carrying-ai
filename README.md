@@ -134,19 +134,21 @@ versa, so it is provably the *same protocol*, not a drifting reimplementation.
 
 The Rust core covers the **whole certificate**, not just the OR-proof: it includes the bit-decomposition
 **range proof** (spend_cap), also wire-compatible — a Rust range proof verifies in Python's `zk_range.verify_le`.
-Full payment certificate (range n=16 + membership), same box:
+There are two backends, both the same protocol: `rust/zkcore` (num-bigint, pure Rust) and `rust/zkcore-gmp`
+(GMP via `rug`, assembly modmul). Full payment certificate (range n=16 + membership), same box:
 
-| | prove | verify |
-|---|---|---|
-| Python | 1372.9 ms | (≈ prove) |
-| Rust `zkcore` | **187.1 ms** | 200.8 ms |
-| speedup | **~7.3×** | |
+| backend | prove | verify | vs Python |
+|---|---|---|---|
+| Python `qedra` | 1372.9 ms | ≈ prove | 1× |
+| Rust `zkcore` (num-bigint) | 186.5 ms | 200.6 ms | ~7.4× |
+| **Rust `zkcore-gmp` (GMP)** | **103.1 ms** | **111.5 ms** | **~13.3×** |
 
-Cross-language: `rust -> python verify OK`, `python -> rust verify OK`, `rust range -> python verify_le OK`,
-tampered commitment rejected by both (`rust/interop_test.py`). The ~7× is honest for a like-for-like bignum
-port (num-bigint vs CPython `pow`); GMP-backed bigints (`rug`) or Montgomery arithmetic would widen it. At
-~0.19 s/cert single-core, native throughput is ~7× the Python numbers above. Builds and runs on the Mini
-cluster (`cargo build --release`), per the repo's compute rules.
+Cross-language, all verified: `rust -> python verify OK`, `python -> rust verify OK`, `rust range -> python
+verify_le OK`, `gmp -> python verify OK`, tampered commitment rejected by both (`rust/interop_test.py`,
+`rust/gmp_interop.py`). Honest on the GMP delta: it is **~1.8× over num-bigint**, not an order of magnitude —
+num-bigint is already good and GMP's edge at 2048-bit is modest (it widens at larger moduli / with dedicated
+routines). Overall ~13× over Python, and a full certificate now proves in ~0.1 s single-core. Builds and runs
+on the Mini cluster (`cargo build --release`), per the repo's compute rules.
 
 ## A real agent action, carrying its own proof (`live_agent_bridge.py`)
 
