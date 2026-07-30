@@ -25,6 +25,20 @@ Runnable demos (python):
 ALL CHECKS PASSED
 ```
 
+## Setup
+
+Requires `python3`, `coqc` (Rocq/Coq), and — for the on-chain part — Foundry. The ZK layer reuses the
+[qedra](https://github.com/ss1738/agent-guardrail) package; clone it where the code expects it, then run the
+whole verification suite:
+
+```bash
+git clone https://github.com/ss1738/agent-guardrail ~/agent-guardrail   # the ZK core + secret rules
+pip install cryptography                                                 # for the Ed25519 signatures
+./verify.sh                                                              # 3 Coq proofs + 10 demos + on-chain
+```
+
+CI (`.github/workflows/ci.yml`) runs exactly this on every push. `pip install -e .` installs the `pcai` CLI.
+
 ## Use it: the `pcai` library + CLI
 
 The pieces come together as one installable tool. `pcai.issue(action, policy, key)` takes an agent action
