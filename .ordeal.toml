@@ -6,6 +6,9 @@ run  = "python3 -m py_compile $(git ls-files '*.py')"
 name = "statute"
 run  = "statute check"
 [[criterion]]
+name = "soundness-policy"
+run  = "specforge run specforge/policy_dsl_soundness.py 100"
+[[criterion]]
 name = "soundness-range"
 run  = "specforge run specforge/zk_range_soundness.py 12"
 [[criterion]]
