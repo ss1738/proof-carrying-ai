@@ -19,9 +19,16 @@ import secrets
 from dataclasses import dataclass
 
 from . import _bulletproof as _bp
+from . import _range as _bitwise
 from . import _zkcore as zk_core
 from ._ec import EC
 from ._zkcore import ZKProof
+
+
+def _range_verify(kind: str, C_amount, cap: int, proof: dict) -> bool:
+    if kind == "bulletproofs":
+        return _bp.verify_le(C_amount, cap, proof)
+    return _bitwise.verify_le(C_amount, cap, proof, group=EC)
 
 Q = EC.q
 _G = EC
@@ -99,7 +106,8 @@ class Certificate:
         cap = int(policy["spend_cap"])
         try:
             Ca = _G.deser(self.commitments["amount"])
-            if not _bp.verify_le(Ca, cap, self.proofs["spend_cap"]):
+            kind = self.proofs.get("spend_cap_kind", "bulletproofs")
+            if not _range_verify(kind, Ca, cap, self.proofs["spend_cap"]):
                 return False, "spend_cap ZK range proof does not verify"
             if not _verify_membership(self.commitments["counterparty"], policy["allowlist"],
                                       self.proofs["allowlist"], "pcai/allowlist"):
@@ -118,8 +126,9 @@ def _canonical(body: dict) -> bytes:
     return json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
 
 
-def issue(action: dict, policy: dict, signing_key, nbits: int = 32) -> Certificate:
+def issue(action: dict, policy: dict, signing_key, nbits: int = 32, range_proof: str = "bulletproofs") -> Certificate:
     """Build a signed, zero-knowledge compliance certificate for `action` under `policy`.
+    `range_proof`: "bulletproofs" (default) = ~6x smaller cert; "bitwise" = ~2x faster to issue.
     Raises ValueError if the action is not compliant (a false statement cannot be proven)."""
     cap = int(policy["spend_cap"])
     amount = int(action["amount"])
@@ -135,11 +144,16 @@ def issue(action: dict, policy: dict, signing_key, nbits: int = 32) -> Certifica
         raise ValueError("residency violated: region not permitted")
 
     r_a = secrets.randbelow(Q)
-    Ca, range_pf = _bp.prove_le(amount, r_a, cap, nbits)
+    if range_proof == "bulletproofs":
+        Ca, range_pf = _bp.prove_le(amount, r_a, cap, nbits)
+    elif range_proof == "bitwise":
+        Ca, range_pf = _bitwise.prove_le(amount, r_a, cap, nbits, group=_G)
+    else:
+        raise ValueError("range_proof must be 'bulletproofs' or 'bitwise'")
     Ccp_hex, memb = _prove_membership(counterparty, allowed_names, "pcai/allowlist")
 
     commitments = {"amount": _G.ser(Ca), "counterparty": Ccp_hex}
-    proofs = {"spend_cap": range_pf, "allowlist": memb}
+    proofs = {"spend_cap": range_pf, "spend_cap_kind": range_proof, "allowlist": memb}
     if regions:
         commitments["region"], proofs["residency"] = _prove_membership(str(action["region"]), regions, "pcai/residency")
 
