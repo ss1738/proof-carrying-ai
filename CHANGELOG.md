@@ -1,12 +1,21 @@
 # Changelog
 
+## 0.3.0
+
+General policy engine + full CLI/service parity.
+
+- **General policy engine** — a policy is a list of rules (`max`/`min` on any numeric field, `in` on any
+  categorical field), so certificates cover *any* agent action (LLM token budgets, tool allowlists, data
+  scopes), not just payments. `spend_cap`/`allowlist`/`residency` remain as shorthand. **Breaking:** the
+  certificate format is now rule-based (`cert.rules`), not the fixed `spend_cap`/`allowlist` fields.
+- **CLI `--policy`/`--action` JSON** — general policies from the command line. `examples/agent_llm_tool.py`.
+- Service hardened to fail closed on any malformed input (never 500); `tests/test_robustness.py`.
+
+
 ## 0.2.0
 
 Product-grade packaging and integration surfaces.
 
-- **General policy engine** — a policy is now a list of rules (`max`/`min` on any numeric field, `in` on any
-  categorical field), so certificates cover *any* agent action (LLM token budgets, tool allowlists, data
-  scopes), not just payments. The `spend_cap`/`allowlist`/`residency` shorthand normalizes to rules.
 
 - **Smaller certificates** — the spend_cap proof now uses **Bulletproofs** (logarithmic size) instead of
   bit-decomposition: a certificate shrank from ~20 KB to ~3.1 KB (~6.4x). Vendored `pcai/_bulletproof.py`.
