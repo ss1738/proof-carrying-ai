@@ -10,6 +10,7 @@ echo "Machine-checked proofs (coqc):"
 coq Compliance.v
 coq PolicyDSL.v
 coq RangeProof.v
+coq RuleEngine.v
 echo "Runnable demos (python):"
 py ec_group.py
 py demo_certificate.py
