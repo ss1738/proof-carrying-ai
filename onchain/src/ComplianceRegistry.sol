@@ -36,15 +36,24 @@ contract ComplianceRegistry {
     }
 
     /// @notice Verify a proof-carrying certificate and record an attestation. Reverts if either proof fails.
-    function attest(bytes32 policyId, RangeVerifier.RangeProof calldata rp, SigmaVerifier.Proof calldata mp)
+    /// The policy id is DERIVED from the parameters actually proven (the spend cap and the allowed set), not
+    /// supplied by the attester -- so a relying party recomputes it from the expected policy and confirms the
+    /// attestation is bound to that policy, not to whatever the attester claimed.
+    function attest(RangeVerifier.RangeProof calldata rp, SigmaVerifier.Proof calldata mp)
         external
         returns (uint256 id)
     {
         require(range.verifyRange(rp), "range proof invalid");
         require(sigma.verify(mp), "membership proof invalid");
+        bytes32 policyId = keccak256(abi.encode(rp.limit, mp.ms)); // bound to what was actually proven
         id = ++count;
         attestations[id] = Attestation(policyId, rp.CAx, rp.CAy, msg.sender, uint64(block.timestamp));
         emit Attested(id, policyId, msg.sender);
+    }
+
+    /// @notice The policy id a relying party should expect for a given cap and allowed set.
+    function policyIdFor(uint256 cap, uint256[] calldata ms) external pure returns (bytes32) {
+        return keccak256(abi.encode(cap, ms));
     }
 
     function isAttested(uint256 id) external view returns (bool) {

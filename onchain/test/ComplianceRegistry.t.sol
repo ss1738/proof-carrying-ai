@@ -49,33 +49,34 @@ contract ComplianceRegistryTest is Test {
         mp.z = vm.parseJsonUintArray(ms, ".z");
     }
 
-    function test_attest_records_valid_certificate() public {
-        bytes32 policyId = keccak256("spend_cap=1000,allow=alice,bob,carol");
-        uint256 id = reg.attest(policyId, rp, mp);
+    function test_attest_binds_policy_id_to_proven_params() public {
+        uint256 id = reg.attest(rp, mp);
         assertEq(id, 1);
         assertTrue(reg.isAttested(1));
-        (bytes32 pid,,,, ) = reg.attestations(1);
-        assertEq(pid, policyId);
+        // the recorded policy id is DERIVED from the proven cap + allowed set, not attester-supplied
+        bytes32 expected = reg.policyIdFor(rp.limit, mp.ms);
+        (bytes32 pid,,,,) = reg.attestations(1);
+        assertEq(pid, expected);
     }
 
     function test_attest_emits_event() public {
-        bytes32 policyId = keccak256("policy");
+        bytes32 expected = keccak256(abi.encode(rp.limit, mp.ms));
         vm.expectEmit(true, true, true, false);
-        emit ComplianceRegistry.Attested(1, policyId, address(this));
-        reg.attest(policyId, rp, mp);
+        emit ComplianceRegistry.Attested(1, expected, address(this));
+        reg.attest(rp, mp);
     }
 
     function test_attest_reverts_on_bad_range() public {
         RangeVerifier.RangeProof memory bad = rp;
         bad.limit = rp.limit + 1; // homomorphic bind breaks
         vm.expectRevert(bytes("range proof invalid"));
-        reg.attest(keccak256("policy"), bad, mp);
+        reg.attest(bad, mp);
     }
 
     function test_attest_reverts_on_bad_membership() public {
         SigmaVerifier.Proof memory bad = mp;
         bad.Cx = mp.Cx + 1; // off-curve / wrong commitment
         vm.expectRevert();
-        reg.attest(keccak256("policy"), rp, bad);
+        reg.attest(rp, bad);
     }
 }
