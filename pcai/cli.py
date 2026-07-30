@@ -35,6 +35,10 @@ def main(argv=None) -> int:
 
     sub.add_parser("keygen", help="create/print the signing key's public key")
 
+    s = sub.add_parser("serve", help="run the HTTP service (POST /certify, /verify; GET /health)")
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=8787)
+
     c = sub.add_parser("certify", help="issue a certificate for an agent action")
     c.add_argument("--amount", type=int, required=True)
     c.add_argument("--counterparty", required=True)
@@ -56,6 +60,11 @@ def main(argv=None) -> int:
     if args.cmd == "keygen":
         key = _load_or_create_key(args.key)
         print(key.public_key().public_bytes_raw().hex())
+        return 0
+
+    if args.cmd == "serve":
+        from .server import serve
+        serve(_load_or_create_key(args.key), args.host, args.port)
         return 0
 
     if args.cmd == "certify":

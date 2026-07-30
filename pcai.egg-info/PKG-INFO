@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: pcai
+Version: 0.1.0
+Summary: Proof-carrying compliance certificates for AI agent actions: zero-knowledge proofs that an action obeyed a formal policy, verifiable by anyone.
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: cryptography>=41
+Dynamic: license-file
+
 # proof-carrying-ai
 
 [![verify](https://github.com/ss1738/proof-carrying-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ss1738/proof-carrying-ai/actions/workflows/ci.yml)
@@ -62,32 +73,9 @@ pcai certify --amount 5000 ...                                  # REFUSED: a non
 
 Add `--regions EU,UK --region UK` to also prove **residency** in zero knowledge (a third membership proof).
 
-**Self-contained.** The `pcai` package vendors its ZK core, so `pip install .` needs only `cryptography` — no
-external path, no cloned dependency. (The repository's *reference demos* still use [qedra](https://github.com/ss1738/agent-guardrail);
-the installable product does not.)
-
-**As a service.** `pcai serve` runs an HTTP API so an agent runtime integrates without linking the library:
-
-```bash
-pcai serve --port 8787
-curl -sX POST localhost:8787/certify -d '{"action":{"amount":750,"counterparty":"alice"},
-                                          "policy":{"spend_cap":1000,"allowlist":["alice","bob"]}}'   # -> signed ZK cert
-curl -sX POST localhost:8787/verify  -d '{"certificate":{...},"policy":{...}}'                        # -> {"valid":true,...}
-```
-A non-compliant action returns `422 {"certifiable": false}` — it cannot be certified.
-
-`tests/test_pcai.py` (9 checks) and `tests/test_server.py` (5 checks) cover the library and the service end to
-end: compliant issues and verifies (2–3 ZK proofs); over-cap / non-allowlisted / wrong-region is refused;
-tampered commitment / wrong key / mismatched policy is rejected.
-
-## Production readiness (honest)
-
-What is **v1.0-grade** today: self-contained installable package + CLI + HTTP service, a full test suite green
-in CI on a clean machine, axiom-free machine-checked soundness, and an on-chain verifier. What still gates a
-true production **1.0**: an **external security audit** of the cryptography (this is prototype crypto —
-Fiat-Shamir in the random-oracle model — until independently reviewed), a live integration with a real agent
-runtime, and broader ZK-native policy coverage. The engineering is v1.0; the crypto is audit-pending. This
-distinction is stated plainly rather than papered over.
+`tests/test_pcai.py` covers the round trip end to end (9 checks): a compliant action issues and verifies
+(2 or 3 ZK proofs), an over-cap / non-allowlisted / wrong-region action is refused, and a tampered commitment
+/ wrong key / mismatched policy is rejected.
 
 ## The two layers of a certificate
 

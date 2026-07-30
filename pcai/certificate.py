@@ -15,20 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import secrets
-import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.expanduser("~/agent-guardrail"))
-
-from ec_group import EC
-from qedra import zk_core
-from qedra.zk_core import ZKProof
-
-import zk_range
+from . import _range as zk_range
+from . import _zkcore as zk_core
+from ._ec import EC
+from ._zkcore import ZKProof
 
 Q = EC.q
 _G = EC
